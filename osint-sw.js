@@ -1,9 +1,9 @@
 // OSINT Toolkit Service Worker — 离线缓存 + PWA 支持
 const CACHE = 'osint-toolkit-v1';
 const ASSETS = [
-  '/osint-toolkit.html',
-  '/osint-icon.svg',
-  '/osint-manifest.json'
+  './osint-toolkit.html',
+  './osint-icon.svg',
+  './osint-manifest.json'
 ];
 
 // 安装时预缓存

@@ -5,13 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CC的妙妙工具 — 网络谜踪 OSINT Toolkit</title>
 <!-- PWA -->
-<link rel="manifest" href="/osint-manifest.json">
+<link rel="manifest" href="./osint-manifest.json">
 <meta name="theme-color" content="#0b0b18">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="OSINT工具">
-<link rel="icon" type="image/svg+xml" href="/osint-icon.svg">
-<link rel="apple-touch-icon" href="/osint-icon.svg">
+<meta name="apple-mobile-web-app-title" content="妙妙工具">
+<link rel="icon" type="image/svg+xml" href="./osint-icon.svg">
+<link rel="apple-touch-icon" href="./osint-icon.svg">
 <!--
   MIT License — 开源免费使用
   网络谜踪 (Internet Sleuthing / OSINT Photo Geolocation) 全能工具合集
@@ -1770,7 +1770,7 @@ console.log('日月·地磁·星空·地理工具·知识图鉴·线索清单·�
 <script>
 // 注册 Service Worker (PWA 离线支持)
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('/osint-sw.js').then(()=>console.log('PWA SW 已注册')).catch(()=>{});
+  navigator.serviceWorker.register('./osint-sw.js').then(()=>console.log('PWA SW 已注册')).catch(()=>{});
 }
 </script>
 </body>
