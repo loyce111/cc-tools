@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CC的识图助手 — Image Sleuth</title>
+<!-- PWA -->
+<link rel="manifest" href="./sleuth-manifest.json">
+<meta name="theme-color" content="#0b0b18">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="识图助手">
+<link rel="icon" type="image/svg+xml" href="./osint-icon.svg">
+<link rel="apple-touch-icon" href="./osint-icon.svg">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0b0b18;--panel:#12122a;--border:#252545;--text:#c8c8e0;--text2:#7777a8;
+  --accent:#f0b830;--accent2:#4fc3f7;--green:#4cdf80;--red:#e94560;
+  --input-bg:#0d0d22;--font-sans:'PingFang SC','Microsoft YaHei','SimHei',sans-serif;
+  --font-mono:'Cascadia Code','Fira Code','Consolas',monospace;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:16px}
+h1{font-size:22px;letter-spacing:3px;color:var(--accent);margin-bottom:4px;text-align:center}
+.subtitle{font-size:12px;color:var(--text2);margin-bottom:16px;text-align:center}
+
+.main-wrap{max-width:800px;width:100%;display:flex;flex-direction:column;gap:14px}
+
+/* 设置区 */
+.settings-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 14px;background:var(--panel);border:1px solid var(--border);border-radius:8px}
+.settings-bar input{background:var(--input-bg);color:var(--text);border:1px solid var(--border);padding:6px 10px;border-radius:5px;font-size:13px;font-family:var(--font-mono);flex:1;min-width:200px;outline:none}
+.settings-bar input:focus{border-color:var(--accent)}
+.settings-bar button{padding:6px 14px;font-size:12px;background:var(--accent);color:#12122a;border:none;border-radius:5px;cursor:pointer;font-weight:bold;white-space:nowrap}
+.settings-bar button:hover{background:#f5c850}
+.settings-bar .status{font-size:11px;color:var(--text2);white-space:nowrap}
+
+/* 图片区 */
+.image-area{border:2px dashed var(--border);border-radius:10px;padding:24px;text-align:center;cursor:pointer;background:var(--panel);transition:border .2s;position:relative;min-height:160px;display:flex;align-items:center;justify-content:center}
+.image-area:hover{border-color:var(--accent2)}
+.image-area.has-image{border-style:solid;border-color:var(--border);cursor:default;padding:0;min-height:auto}
+.image-area img{max-width:100%;max-height:400px;border-radius:8px;display:block}
+.image-area .placeholder{color:var(--text2);font-size:14px}
+.image-area .placeholder .icon{font-size:48px;margin-bottom:8px}
+.image-area .btn-change{position:absolute;top:8px;right:8px;padding:4px 10px;font-size:11px;background:rgba(0,0,0,0.6);color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:4px;cursor:pointer}
+
+/* 输入区 */
+.input-row{display:flex;gap:8px;align-items:center}
+.input-row textarea{flex:1;background:var(--input-bg);color:var(--text);border:1px solid var(--border);padding:10px 14px;border-radius:8px;font-size:14px;font-family:var(--font-sans);outline:none;resize:none;min-height:60px}
+.input-row textarea:focus{border-color:var(--accent)}
+.input-row button{padding:12px 24px;font-size:15px;background:var(--accent);color:#12122a;border:none;border-radius:8px;cursor:pointer;font-weight:bold;white-space:nowrap;align-self:flex-end}
+.input-row button:hover:not(:disabled){background:#f5c850}
+.input-row button:disabled{opacity:0.5;cursor:not-allowed}
+
+.quick-btns{display:flex;gap:6px;flex-wrap:wrap}
+.quick-btns button{padding:4px 10px;font-size:11px;background:rgba(79,195,247,0.1);color:var(--accent2);border:1px solid rgba(79,195,247,0.2);border-radius:4px;cursor:pointer;font-family:var(--font-sans)}
+.quick-btns button:hover{background:rgba(79,195,247,0.2)}
+
+/* 回答区 */
+.answer-box{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:0;overflow:hidden}
+.answer-box .header{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(240,184,48,0.06);border-bottom:1px solid var(--border);font-size:13px;color:var(--accent)}
+.answer-box .content{padding:16px;font-size:14px;line-height:1.8;white-space:pre-wrap;word-break:break-word}
+.answer-box .content.empty{color:var(--text2);text-align:center;padding:40px 16px}
+.answer-box .loading{padding:30px;text-align:center;color:var(--accent);font-size:14px}
+.answer-box .loading .dot{animation:blink 1.4s infinite}
+.answer-box .loading .dot:nth-child(2){animation-delay:.2s}
+.answer-box .loading .dot:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:0}40%{opacity:1}}
+
+/* 分析过程 */
+.thinking-box{margin-top:8px;padding:12px 14px;background:rgba(79,195,247,0.04);border:1px solid rgba(79,195,247,0.15);border-radius:6px}
+.thinking-box summary{font-size:12px;color:var(--accent2);cursor:pointer;letter-spacing:1px}
+.thinking-box .thinking-content{margin-top:8px;font-size:12px;color:var(--text2);line-height:1.7;white-space:pre-wrap}
+
+.note{font-size:11px;color:var(--text2);margin-top:4px;text-align:center}
+.note a{color:var(--accent2)}
+</style>
+</head>
+<body>
+
+<h1>🔍 CC的识图助手</h1>
+<div class="subtitle">上传照片 · 提出问题 · AI 分析回答 · OSINT 地理定位</div>
+
+<div class="main-wrap">
+  <!-- API Key -->
+  <div class="settings-bar">
+    <span style="font-size:12px;color:var(--text2);white-space:nowrap">🔑 Key:</span>
+    <input id="api-key" type="password" placeholder="粘贴 API Key">
+    <span style="font-size:12px;color:var(--text2);white-space:nowrap">🤖 模型:</span>
+    <select id="model-select" style="background:var(--input-bg);color:var(--text);border:1px solid var(--border);padding:6px 8px;border-radius:5px;font-size:12px;font-family:var(--font-sans)">
+      <option value="Qwen/Qwen3-VL-8B-Instruct">Qwen3-VL-8B (快+省)</option>
+      <option value="Qwen/Qwen3-VL-32B-Instruct">Qwen3-VL-32B (精准)</option>
+      <option value="Qwen/Qwen3-VL-8B-Thinking">Qwen3-VL-8B (深度思考)</option>
+      <option value="Qwen/Qwen3-VL-32B-Thinking">Qwen3-VL-32B (深度思考)</option>
+      <option value="zai-org/GLM-4.5V">GLM-4.5V (中文强)</option>
+      <option value="deepseek-ai/DeepSeek-OCR">DeepSeek-OCR (文字识别)</option>
+      <option value="PaddlePaddle/PaddleOCR-VL-1.5">PaddleOCR-VL (文字识别)</option>
+    </select>
+    <button onclick="saveApiKey()">保存</button>
+    <span class="status" id="key-status">未设置</span>
+  </div>
+
+  <!-- 图片上传 -->
+  <div class="image-area" id="image-area" onclick="document.getElementById('file-input').click()">
+    <div class="placeholder"><div class="icon">🖼️</div>点击或拖拽上传照片<br><span style="font-size:11px">支持 JPEG / PNG / WebP</span></div>
+    <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp" style="display:none">
+  </div>
+
+  <!-- 快捷提问 -->
+  <div class="quick-btns">
+    <button onclick="askPreset('这张照片里有什么？请详细描述你看到的所有东西，包括人物、物体、文字、建筑、自然景观等。')">📋 图中有啥</button>
+    <button onclick="askPreset('分析这张照片可能的拍摄地点。注意以下线索：文字语言、建筑风格、植被类型、道路行驶方向、路标样式、车牌格式、天气和光照。给出具体的国家和城市推测，并说明分析过程。')">📍 拍摄地点</button>
+    <button onclick="askPreset('分析这张照片的拍摄时间。注意以下线索：光照方向和强度（太阳位置）、影子长度和方向、天空颜色、人物着装（季节）、是否有月亮或星星。给出可能的时段、季节，并说明推理过程。')">🕐 拍摄时间</button>
+    <button onclick="askPreset('请进行完整的OSINT地理定位分析：1) 首先列举图中所有可识别的线索；2) 逐条分析每条线索指向的地理区域；3) 交叉验证缩小范围；4) 给出最可能的拍摄地点（国家→城市→甚至街道级别）。请展示完整的推理链。')">🔍 完整分析</button>
+  </div>
+
+  <!-- 提问输入 -->
+  <div class="input-row">
+    <textarea id="question" placeholder="输入你的问题，如：这张照片可能在哪个城市拍的？图中招牌上写的什么语言？" rows="2"></textarea>
+    <button id="ask-btn" onclick="askQuestion()">🚀 提问</button>
+  </div>
+
+  <!-- 回答 -->
+  <div class="answer-box">
+    <div class="header">💬 AI 回答</div>
+    <div class="content empty" id="answer-content">上传照片后提问，AI 会分析回答</div>
+    <div class="loading" id="answer-loading" style="display:none">分析中<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></div>
+  </div>
+
+  <!-- 分析过程 -->
+  <details class="thinking-box" id="thinking-detail" style="display:none">
+    <summary>🧠 查看分析过程</summary>
+    <div class="thinking-content" id="thinking-content"></div>
+  </details>
+
+  <div class="note">使用 <a href="https://console.anthropic.com" target="_blank">Anthropic Claude API</a> · 图片仅用于本次分析不存储 · API费用自理</div>
+</div>
+
+<script>
+let currentImageData=null, currentImageType=null;
+
+// API Key 管理 (localStorage)
+function loadApiKey(){
+  let key=localStorage.getItem('cc-sleuth-api-key');
+  if(key){
+    document.getElementById('api-key').value=key;
+    document.getElementById('key-status').textContent='✅ 已保存';
+    document.getElementById('key-status').style.color='var(--green)';
+  }
+}
+function saveApiKey(){
+  let key=document.getElementById('api-key').value.trim();
+  if(!key){alert('请输入 API Key');return}
+  if(!key.startsWith('sk-')){
+    if(!confirm('API Key 格式好像不对（应以 sk- 开头）。确定保存？'))return;
+  }
+  localStorage.setItem('cc-sleuth-api-key',key);
+  document.getElementById('key-status').textContent='✅ 已保存';
+  document.getElementById('key-status').style.color='var(--green)';
+}
+function getApiKey(){
+  return document.getElementById('api-key').value.trim() || localStorage.getItem('cc-sleuth-api-key') || '';
+}
+
+// 图片上传
+let fi=document.getElementById('file-input');
+fi.addEventListener('change',function(){if(this.files[0])loadImage(this.files[0])});
+
+let ia=document.getElementById('image-area');
+ia.addEventListener('dragover',function(e){e.preventDefault();this.style.borderColor='var(--accent)'});
+ia.addEventListener('dragleave',function(e){this.style.borderColor='var(--border)'});
+ia.addEventListener('drop',function(e){
+  e.preventDefault();this.style.borderColor='var(--border)';
+  let f=e.dataTransfer.files[0];if(f)loadImage(f);
+});
+
+function loadImage(file){
+  if(!file.type.match(/image\/(jpeg|png|webp)/)){alert('请上传 JPEG/PNG/WebP 格式');return}
+  let reader=new FileReader();
+  reader.onload=function(ev){
+    currentImageData=ev.target.result.split(',')[1]; // base64 without prefix
+    currentImageType=file.type;
+    let img=document.createElement('img');img.src=ev.target.result;
+    let area=document.getElementById('image-area');
+    area.innerHTML='';area.appendChild(img);
+    area.classList.add('has-image');
+    // 切换图片按钮
+    let btn=document.createElement('div');btn.className='btn-change';btn.textContent='换图';
+    btn.onclick=function(e){e.stopPropagation();resetImage()};
+    area.appendChild(btn);
+    // 清空旧回答
+    document.getElementById('answer-content').className='content empty';
+    document.getElementById('answer-content').textContent='照片已加载，请输入问题 👆';
+    document.getElementById('thinking-detail').style.display='none';
+  };
+  reader.readAsDataURL(file);
+}
+
+function resetImage(){
+  currentImageData=null;currentImageType=null;
+  let area=document.getElementById('image-area');
+  area.innerHTML='<div class="placeholder"><div class="icon">🖼️</div>点击或拖拽上传照片<br><span style="font-size:11px">支持 JPEG / PNG / WebP</span></div>';
+  area.classList.remove('has-image');
+  document.getElementById('answer-content').className='content empty';
+  document.getElementById('answer-content').textContent='上传照片后提问，AI 会分析回答';
+  document.getElementById('thinking-detail').style.display='none';
+}
+
+function askPreset(q){
+  document.getElementById('question').value=q;
+  askQuestion();
+}
+
+// 调用 AI API（自动识别 Anthropic / SiliconFlow / OpenAI 兼容）
+async function askQuestion(){
+  let apiKey=getApiKey();
+  if(!apiKey){alert('请先设置 API Key（在顶部输入框）');return}
+  if(!currentImageData){alert('请先上传一张照片');return}
+
+  let question=document.getElementById('question').value.trim();
+  if(!question)question='请详细分析这张照片，描述图中的所有内容';
+
+  let btn=document.getElementById('ask-btn');
+  btn.disabled=true;btn.textContent='分析中...';
+  document.getElementById('answer-loading').style.display='block';
+  document.getElementById('answer-content').className='content';
+  document.getElementById('answer-content').textContent='';
+  document.getElementById('thinking-detail').style.display='none';
+
+  try{
+    let systemPrompt=`你是一个网络谜踪（OSINT）和图像分析专家。你的任务是根据用户上传的照片回答他们的问题。
+
+分析原则：
+1. 仔细观察照片中的每一个细节——文字、建筑、植被、天气、光影、人物着装、车辆、路标等
+2. 对于地理位置相关的问题，使用系统化的 OSINT 方法论：先列举线索，再逐条分析，最后交叉验证
+3. 对于时间相关的问题，关注太阳位置、影子方向/长度、天空颜色、季节线索
+4. 明确指出你的推理链条，区分"确定"和"推测"
+5. 如果无法确定，给出可能的范围而不是胡乱猜测
+
+回答格式：
+- 先给出直接答案
+- 然后用"分析过程"详细说明推理步骤
+- 标注每条结论的置信度（确定/很可能/可能/猜测）
+
+用中文回答。`;
+
+    let answer='';
+    let isAnthropic=apiKey.startsWith('sk-ant-');
+
+    if(isAnthropic){
+      // Anthropic Claude API
+      let response=await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{
+          'Content-Type':'application/json',
+          'x-api-key':apiKey,
+          'anthropic-version':'2023-06-01',
+          'anthropic-dangerous-direct-browser-access':'true'
+        },
+        body:JSON.stringify({
+          model:'claude-sonnet-4-20250514',
+          max_tokens:4096,
+          system:systemPrompt,
+          messages:[{role:'user',content:[
+            {type:'image',source:{type:'base64',media_type:currentImageType,data:currentImageData}},
+            {type:'text',text:question}
+          ]}]
+        })
+      });
+      if(!response.ok){let err=await response.json();throw new Error(err.error?.message||'Anthropic 请求失败: '+response.status)}
+      let data=await response.json();
+      answer=data.content[0].text;
+    }else{
+      // SiliconFlow / OpenAI 兼容 API
+      let model=document.getElementById('model-select').value;
+      let response=await fetch('https://api.siliconflow.cn/v1/chat/completions',{
+        method:'POST',
+        headers:{
+          'Content-Type':'application/json',
+          'Authorization':'Bearer '+apiKey
+        },
+        body:JSON.stringify({
+          model:model,
+          max_tokens:4096,
+          temperature:0.7,
+          messages:[
+            {role:'system',content:systemPrompt},
+            {role:'user',content:[
+              {type:'image_url',image_url:{url:'data:'+currentImageType+';base64,'+currentImageData}},
+              {type:'text',text:question}
+            ]}
+          ]
+        })
+      });
+      if(!response.ok){let err=await response.json();throw new Error(err.error?.message||err.message||'SiliconFlow 请求失败: '+response.status)}
+      let data=await response.json();
+      answer=data.choices[0].message.content;
+    }
+
+    // 分离分析过程
+    let thinking=answer;
+    document.getElementById('answer-content').textContent=answer;
+    document.getElementById('answer-content').className='content';
+    document.getElementById('thinking-content').textContent=thinking;
+    document.getElementById('thinking-detail').style.display='block';
+
+  }catch(e){
+    document.getElementById('answer-content').textContent='❌ 错误: '+e.message;
+    document.getElementById('answer-content').className='content';
+    document.getElementById('thinking-detail').style.display='none';
+  }
+
+  document.getElementById('answer-loading').style.display='none';
+  btn.disabled=false;btn.textContent='🚀 提问';
+}
+
+loadApiKey();
+// 恢复保存的 Key 到输入框
+let savedKey=localStorage.getItem('cc-sleuth-api-key');
+if(savedKey)document.getElementById('api-key').value=savedKey;
+</script>
+</body>
+</html>
