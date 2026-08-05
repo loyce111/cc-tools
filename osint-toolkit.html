@@ -5,13 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CC的妙妙工具 — 网络谜踪 OSINT Toolkit</title>
 <!-- PWA -->
-<link rel="manifest" href="./osint-manifest.json">
+<link rel="manifest" href="/osint-manifest.json">
 <meta name="theme-color" content="#0b0b18">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="妙妙工具">
-<link rel="icon" type="image/svg+xml" href="./osint-icon.svg">
-<link rel="apple-touch-icon" href="./osint-icon.svg">
+<meta name="apple-mobile-web-app-title" content="OSINT工具">
+<link rel="icon" type="image/svg+xml" href="/osint-icon.svg">
+<link rel="apple-touch-icon" href="/osint-icon.svg">
 <!--
   MIT License — 开源免费使用
   网络谜踪 (Internet Sleuthing / OSINT Photo Geolocation) 全能工具合集
@@ -129,7 +129,6 @@ h4.sub-title{color:var(--accent2);margin-bottom:8px;font-size:14px}
   <button class="tab-btn" data-tab="checklist">📋 线索清单</button>
   <button class="tab-btn" data-tab="coordsys">🗺️ 坐标系统</button>
   <button class="tab-btn" data-tab="transport">✈️🚄 交通查询</button>
-  <button class="tab-btn" data-tab="photo">📷 照片分析</button>
 </div>
 
 <div class="main-wrap">
@@ -515,55 +514,6 @@ h4.sub-title{color:var(--accent2);margin-bottom:8px;font-size:14px}
   </div>
 </div>
 
-
-<!-- ==================== 12. 照片分析 ==================== -->
-<div class="tab-panel" id="panel-photo">
-  <div style="display:flex;flex-wrap:wrap;gap:16px;">
-    <!-- 上传区 -->
-    <div style="flex:1;min-width:300px;">
-      <h3 class="panel-title">📷 上传照片</h3>
-      <div id="photo-drop" style="border:2px dashed var(--border);border-radius:10px;padding:32px;text-align:center;cursor:pointer;background:var(--input-bg);transition:border .2s"
-        ondragover="this.style.borderColor='var(--accent)';event.preventDefault()"
-        ondragleave="this.style.borderColor='var(--border)'"
-        ondrop="handlePhotoDrop(event)"
-        onclick="document.getElementById('photo-file').click()">
-        <div style="font-size:40px;margin-bottom:8px">🖼️</div>
-        <div style="color:var(--text2);font-size:13px">拖拽照片到此处 或 点击选择</div>
-        <div style="color:var(--text2);font-size:11px;margin-top:4px">支持 JPEG/PNG · EXIF 自动读取 · 本地处理不传输</div>
-        <input type="file" id="photo-file" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="handlePhotoFile(this)">
-      </div>
-      <!-- Canvas 测量区 -->
-      <div style="margin-top:10px;position:relative;display:none" id="photo-canvas-wrap">
-        <canvas id="photo-canvas" style="max-width:100%;border-radius:6px;cursor:crosshair"></canvas>
-        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <button class="btn btn-go btn-sm" onclick="resetMeasure()">🔄 重置测量</button>
-          <span style="font-size:12px;color:var(--text2)" id="measure-info">点击图片设置测量点</span>
-          <span style="font-size:12px;color:var(--accent);font-family:var(--font-mono)" id="measure-result"></span>
-        </div>
-        <div class="row" style="margin-top:4px">
-          <div class="field"><label>参照物实际高度 (m)</label><input id="ref-height" class="w100" placeholder="如 1.75"></div>
-          <button class="btn btn-go btn-sm" onclick="calcPhotoShadow()">→ 计算太阳高度</button>
-        </div>
-        <div class="result-item" style="margin-top:6px"><div class="val sm" id="photo-sun-el">--</div><div class="lbl">太阳高度角（基于照片测量）</div></div>
-      </div>
-    </div>
-    <!-- EXIF 数据 -->
-    <div style="flex:1;min-width:280px;">
-      <h3 class="panel-title">📋 EXIF 元数据</h3>
-      <div id="exif-data" style="font-size:12px;color:var(--text2);line-height:1.8">
-        <div class="note">上传照片后自动显示。注意：社交媒体通常会删除 EXIF 数据。</div>
-      </div>
-      <div id="exif-gps" style="margin-top:8px;display:none">
-        <h4 style="color:var(--green);margin-bottom:4px">📍 GPS 定位!</h4>
-        <div class="result-item" style="text-align:left">
-          <div class="val sm" id="exif-gps-coord" style="font-size:13px"></div>
-          <div id="exif-gps-links" style="margin-top:4px"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="note" style="margin-top:10px">💡 <strong>网络谜踪提示：</strong>Instagram/Facebook/微信等平台会删除 EXIF。Twitter/X 保留部分元数据。如果照片有 GPS 坐标 → 直接定位。没有 EXIF → 使用上面的测量工具估算影子/物体比例。</div>
-</div>
 
 </div><!-- /main-wrap -->
 
@@ -1211,239 +1161,6 @@ function filterAirports(){
   buildAirportTable(document.getElementById('airport-search').value);
 }
 
-/* ==================== 照片分析: EXIF 解析器 ==================== */
-// 轻量 JPEG EXIF 解析 — 提取 GPS / DateTime / 设备信息
-function parseEXIF(buffer){
-  let view=new DataView(buffer), info={};
-  if(view.getUint16(0)!==0xFFD8)return{error:'不是 JPEG 文件'};
-
-  let offset=2, marker;
-  while(offset<view.byteLength){
-    marker=view.getUint16(offset);
-    if(marker===0xFFE1){ // APP1 = EXIF
-      offset+=2;
-      let len=view.getUint16(offset); offset+=2;
-      let exifStart=offset;
-      // 检查 Exif 标识
-      let id=String.fromCharCode(view.getUint8(offset),view.getUint8(offset+1),view.getUint8(offset+2),view.getUint8(offset+3));
-      if(id!=='Exif')break;
-      offset+=6; // "Exif\0\0"
-      // TIFF header
-      let tiffStart=offset;
-      let bigEndian=view.getUint16(offset)===0x4D4D; offset+=2;
-      let fortyTwo=bigEndian?view.getUint16(offset):view.getUint16(offset,true); offset+=2;
-      if(fortyTwo!==42)break;
-      function readU16(o){return bigEndian?view.getUint16(o):view.getUint16(o,true)}
-      function readU32(o){return bigEndian?view.getUint32(o):view.getUint32(o,true)}
-      function readStr(o,len){let s='';for(let i=0;i<len;i++)s+=String.fromCharCode(view.getUint8(o+i));return s.replace(/\0+$/,'')}
-
-      let ifd0Off=readU32(offset); offset=tiffStart+ifd0Off;
-      let entries0=readU16(offset); offset+=2;
-      let make=null,model=null,dateTime=null,orientation=null,gpsIFD=null,exifIFD=null;
-
-      // 读取 IFD0
-      for(let i=0;i<entries0;i++){
-        let tag=readU16(offset),type=readU16(offset+2),count=readU32(offset+4),valOff=offset+8;
-        if(count===1&&(type===3||type===4||type===9)){ /* val in 4 bytes */ }
-        else{ /* valOff points to data */ }
-        if(tag===0x010F)make=readStr(tiffStart+readU32(valOff),count);
-        if(tag===0x0110)model=readStr(tiffStart+readU32(valOff),count);
-        if(tag===0x0132)dateTime=readStr(tiffStart+readU32(valOff),count);
-        if(tag===0x0112)orientation=readU16(valOff);
-        if(tag===0x8825)gpsIFD=readU32(valOff);
-        if(tag===0x8769)exifIFD=readU32(valOff);
-        offset+=12;
-      }
-      if(make)info.make=make;
-      if(model)info.model=model;
-      if(dateTime)info.dateTime=dateTime;
-      if(orientation)info.orientation=orientation;
-
-      // 读取 GPS IFD
-      if(gpsIFD){
-        offset=tiffStart+gpsIFD;
-        let gpsEntries=readU16(offset); offset+=2;
-        let gpsLat=null,gpsLatRef=null,gpsLng=null,gpsLngRef=null,gpsAlt=null,gpsTime=null;
-        for(let i=0;i<gpsEntries;i++){
-          let tag=readU16(offset),type=readU16(offset+2),count=readU32(offset+4),vo=offset+8;
-          let getRat=()=>{let num=readU32(tiffStart+readU32(vo)),den=readU32(tiffStart+readU32(vo)+4);return num/den};
-          if(tag===0x0001)gpsLatRef=readStr(tiffStart+readU32(vo),2);
-          if(tag===0x0002){gpsLat=[getRat()];vo+=8;gpsLat.push(getRat());vo+=8;gpsLat.push(getRat())}
-          if(tag===0x0003)gpsLngRef=readStr(tiffStart+readU32(vo),2);
-          if(tag===0x0004){gpsLng=[getRat()];vo+=8;gpsLng.push(getRat());vo+=8;gpsLng.push(getRat())}
-          if(tag===0x0006)gpsAlt=getRat();
-          offset+=12;
-        }
-        if(gpsLat&&gpsLng){
-          let lat=gpsLat[0]+gpsLat[1]/60+gpsLat[2]/3600;
-          let lng=gpsLng[0]+gpsLng[1]/60+gpsLng[2]/3600;
-          if(gpsLatRef==='S')lat=-lat;
-          if(gpsLngRef==='W')lng=-lng;
-          info.gps={lat,lng,alt:gpsAlt};
-        }
-      }
-
-      // 读取 Exif IFD (SubIFD) 获取 DateTimeOriginal
-      if(exifIFD){
-        offset=tiffStart+exifIFD;
-        let exifEntries=readU16(offset); offset+=2;
-        for(let i=0;i<exifEntries;i++){
-          let tag=readU16(offset),count=readU32(offset+4),vo=offset+8;
-          if(tag===0x9003)info.dateTimeOriginal=readStr(tiffStart+readU32(vo),count);
-          if(tag===0x9004)info.dateTimeDigitized=readStr(tiffStart+readU32(vo),count);
-          offset+=12;
-        }
-      }
-      break;
-    }
-    offset+=2;
-    let segLen=view.getUint16(offset); offset+=segLen;
-  }
-  return info;
-}
-
-/* ==================== 照片分析 UI ==================== */
-let photoMeasurePoints=[], photoImage=null;
-
-function handlePhotoDrop(e){
-  e.preventDefault();e.currentTarget.style.borderColor='var(--border)';
-  let file=e.dataTransfer.files[0];
-  if(file)processPhoto(file);
-}
-function handlePhotoFile(input){
-  let file=input.files[0];
-  if(file)processPhoto(file);
-}
-
-function processPhoto(file){
-  if(!file.type.match(/image\/(jpeg|png|webp)/)){alert('请上传 JPEG/PNG/WebP 格式');return}
-
-  // 显示图片
-  let reader=new FileReader();
-  reader.onload=function(ev){
-    photoImage=new Image();
-    photoImage.onload=function(){
-      let canvas=document.getElementById('photo-canvas');
-      let wrap=document.getElementById('photo-canvas-wrap');
-      let maxW=Math.min(photoImage.width,580);
-      let scale=maxW/photoImage.width;
-      canvas.width=maxW;
-      canvas.height=photoImage.height*scale;
-      let ctx=canvas.getContext('2d');
-      ctx.drawImage(photoImage,0,0,maxW,photoImage.height*scale);
-      wrap.style.display='block';
-      resetMeasure();
-    };
-    photoImage.src=ev.target.result;
-  };
-  reader.readAsDataURL(file);
-
-  // 解析 EXIF
-  let exifReader=new FileReader();
-  exifReader.onload=function(ev){
-    let info=parseEXIF(ev.target.result);
-    displayEXIF(info);
-  };
-  exifReader.readAsArrayBuffer(file);
-}
-
-function displayEXIF(info){
-  let div=document.getElementById('exif-data');
-  let gpsDiv=document.getElementById('exif-gps');
-  if(info.error){div.innerHTML='<div class=note>'+info.error+'</div>';gpsDiv.style.display='none';return}
-
-  let rows=[];
-  if(info.dateTimeOriginal)rows.push('<strong>📅 拍摄时间:</strong> '+info.dateTimeOriginal);
-  else if(info.dateTime)rows.push('<strong>📅 修改时间:</strong> '+info.dateTime);
-  if(info.make)rows.push('<strong>📷 相机:</strong> '+info.make+' '+((info.model||'')));
-  if(info.orientation)rows.push('<strong>🔄 方向:</strong> '+['','正常','左右翻转','180°','上下翻转','左右翻转+逆时针','顺时针','顺时针+左右翻转','逆时针'][info.orientation]||'');
-  if(rows.length===0)rows.push('<span class=note>此照片不含 EXIF 元数据（可能被社交平台删除）</span>');
-
-  div.innerHTML=rows.map(r=>'<div>'+r+'</div>').join('');
-
-  // GPS
-  if(info.gps){
-    let lat=info.gps.lat.toFixed(6), lng=info.gps.lng.toFixed(6);
-    document.getElementById('exif-gps-coord').textContent=lat+', '+lng;
-    let c=lat+','+lng;
-    document.getElementById('exif-gps-links').innerHTML=
-      '<a href="https://www.google.com/maps?q='+c+'" target=_blank style=color:var(--accent2)>Google Maps</a> | '+
-      '<a href="https://earth.google.com/web/search/'+c+'" target=_blank style=color:var(--accent2)>Google Earth</a> | '+
-      '<a href="https://www.openstreetmap.org/?mlat='+lat+'&mlon='+lng+'" target=_blank style=color:var(--accent2)>OSM</a>';
-    gpsDiv.style.display='block';
-  }else{
-    gpsDiv.style.display='none';
-  }
-}
-
-// Canvas 点击测量
-document.addEventListener('DOMContentLoaded',()=>{
-  let c=document.getElementById('photo-canvas');
-  if(c){
-    c.addEventListener('click',function(e){
-      if(!photoImage)return;
-      let rect=c.getBoundingClientRect();
-      let x=e.clientX-rect.left, y=e.clientY-rect.top;
-      photoMeasurePoints.push({x,y});
-
-      // 重绘
-      let ctx=c.getContext('2d');
-      let scale=c.width/photoImage.width;
-      ctx.drawImage(photoImage,0,0,c.width,c.height);
-
-      // 画测量点
-      photoMeasurePoints.forEach((p,i)=>{
-        ctx.beginPath();ctx.arc(p.x,p.y,5,0,Math.PI*2);
-        ctx.fillStyle=i===0?'#4fc3f7':'#e94560';ctx.fill();
-        ctx.fillStyle='#fff';ctx.font='11px '+"monospace";ctx.fillText('P'+(i+1),p.x+8,p.y-8);
-      });
-
-      // 画连线
-      if(photoMeasurePoints.length>=2){
-        let p1=photoMeasurePoints[0],p2=photoMeasurePoints[1];
-        ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);
-        ctx.strokeStyle='#f0b830';ctx.lineWidth=2;ctx.setLineDash([5,3]);ctx.stroke();ctx.setLineDash([]);
-        let px=Math.sqrt((p2.x-p1.x)**2+(p2.y-p1.y)**2);
-        document.getElementById('measure-result').textContent='像素距离: '+px.toFixed(0)+' px';
-        document.getElementById('measure-info').textContent='P1=参照物起点 | P2=参照物终点/影子末端';
-      }else{
-        document.getElementById('measure-info').textContent='已点 '+photoMeasurePoints.length+' 点，需点2点';
-      }
-
-      if(photoMeasurePoints.length>=2)calcPhotoShadow();
-    });
-  }
-});
-
-function resetMeasure(){
-  photoMeasurePoints=[];
-  if(photoImage&&document.getElementById('photo-canvas')){
-    let c=document.getElementById('photo-canvas');
-    let ctx=c.getContext('2d');
-    ctx.drawImage(photoImage,0,0,c.width,c.height);
-  }
-  document.getElementById('measure-result').textContent='';
-  document.getElementById('measure-info').textContent='点击图片设置测量点';
-  document.getElementById('photo-sun-el').textContent='--';
-}
-
-function calcPhotoShadow(){
-  if(photoMeasurePoints.length<2)return;
-  let p1=photoMeasurePoints[0],p2=photoMeasurePoints[1];
-  let shadowPx=Math.sqrt((p2.x-p1.x)**2+(p2.y-p1.y)**2);
-  let objH=parseFloat(document.getElementById('ref-height').value);
-  if(isNaN(objH)||objH<=0){
-    document.getElementById('photo-sun-el').textContent='请填写参照物实际高度';
-    return;
-  }
-  // 假设 P1→P2 = 物体高度 (需要用户选物体，而非影子)
-  // 实际用法: P1=物体顶部, P2=物体底部 → 物体像素高
-  // 再: P1=物体顶部, P2'=影子尖端 → 影子像素长
-  // 此处简化: P1→P2=影子长度, 物体高度=用户手动输入
-  let elev=Math.atan(objH/(shadowPx/100))*DEG; // 假设 100px≈1m 粗略
-  if(elev>90)elev=90;
-  document.getElementById('photo-sun-el').textContent='~'+elev.toFixed(1)+'°（粗略，需校准比例尺）';
-}
 
 /* ==================== UI 初始化 ==================== */
 function initDates(){
@@ -1770,7 +1487,7 @@ console.log('日月·地磁·星空·地理工具·知识图鉴·线索清单·�
 <script>
 // 注册 Service Worker (PWA 离线支持)
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('./osint-sw.js').then(()=>console.log('PWA SW 已注册')).catch(()=>{});
+  navigator.serviceWorker.register('/osint-sw.js').then(()=>console.log('PWA SW 已注册')).catch(()=>{});
 }
 </script>
 </body>
