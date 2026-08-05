@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>五子棋 - 圆形序号版</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background: #ffffff;
+    font-family: 'SimHei', '黑体', 'Microsoft YaHei', sans-serif;
+    color: #333;
+    padding: 20px;
+  }
+  h1 { margin-bottom: 4px; font-size: 28px; letter-spacing: 4px; }
+  .info { margin-bottom: 14px; font-size: 14px; color: #665500; }
+  .status {
+    font-size: 22px;
+    margin-bottom: 12px;
+    padding: 8px 28px;
+    background: #fff;
+    border-radius: 20px;
+    letter-spacing: 2px;
+    color: #333;
+  }
+  .board-wrap {
+    background: #d4a754;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  }
+  canvas { display: block; cursor: pointer; }
+  .btn-row { margin-top: 16px; display: flex; gap: 12px; }
+  button {
+    padding: 10px 28px; font-size: 16px; border: none;
+    border-radius: 6px; cursor: pointer; letter-spacing: 2px;
+    font-weight: bold; transition: all 0.2s;
+  }
+  .btn-restart { background: #e94560; color: #fff; }
+  .btn-restart:hover { background: #ff6b81; }
+  .btn-undo { background: #0f3460; color: #fff; }
+  .btn-undo:hover { background: #1a508b; }
+</style>
+</head>
+<body>
+
+<h1>五 子 棋</h1>
+<div class="info">圆形序号 1 ~ 225 · 点击落子</div>
+<div class="status" id="status">● 黑方落子</div>
+
+<div class="board-wrap">
+  <canvas id="board"></canvas>
+</div>
+
+<div class="btn-row">
+  <button class="btn-undo" onclick="undo()">⟲ 悔棋</button>
+  <button class="btn-restart" onclick="restart()">↻ 重新开始</button>
+</div>
+
+<script>
+const SIZE = 15;
+const GAP = 10;
+const CIR = 28;
+const CELL = CIR * 2 + GAP;
+const MARGIN = 12;
+const CANVAS = MARGIN * 2 + CELL * SIZE - GAP;
+
+const canvas = document.getElementById('board');
+canvas.width = CANVAS;
+canvas.height = CANVAS;
+const ctx = canvas.getContext('2d');
+const statusEl = document.getElementById('status');
+
+let grid = Array(SIZE).fill(null).map(() => Array(SIZE).fill(null));
+let blackTurn = true;
+let gameOver = false;
+let history = [];
+
+function cellToNum(row, col) {
+  return row * SIZE + col + 1;
+}
+
+function getPos(row, col) {
+  return {
+    x: MARGIN + col * CELL + CIR,
+    y: MARGIN + row * CELL + CIR
+  };
+}
+
+function drawBoard() {
+  ctx.clearRect(0, 0, CANVAS, CANVAS);
+
+  // 木板纹理背景
+  ctx.fillStyle = '#d4a754';
+  ctx.fillRect(0, 0, CANVAS, CANVAS);
+
+  // 木纹
+  ctx.globalAlpha = 0.15;
+  for (let i = 0; i < CANVAS; i += 3) {
+    ctx.strokeStyle = i % 6 < 3 ? '#b8923a' : '#e0c070';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, i + Math.sin(i * 0.02) * 2);
+    ctx.lineTo(CANVAS, i + Math.sin(i * 0.02 + 1) * 2);
+    ctx.stroke();
+  }
+  // 竖纹
+  for (let i = 0; i < CANVAS; i += 8) {
+    ctx.strokeStyle = 'rgba(139,100,40,0.08)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(i + Math.sin(i * 0.03) * 3, 0);
+    ctx.lineTo(i + Math.sin(i * 0.03 + 1) * 3, CANVAS);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // 画每个圆形序号
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      const { x, y } = getPos(r, c);
+      const num = cellToNum(r, c);
+
+      if (grid[r][c] === null) {
+        // 空位 - 米白色圆形 + 数字
+        ctx.fillStyle = '#f5f0e0';
+        ctx.beginPath();
+        ctx.arc(x, y, CIR, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#c5b898';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(x, y, CIR, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // 数字
+        ctx.fillStyle = '#3a2a0a';
+        ctx.font = 'bold 21px "SimHei", "黑体", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(num, x, y);
+      } else if (grid[r][c] === 'black') {
+        // 黑子
+        const grad = ctx.createRadialGradient(x - 5, y - 5, 3, x, y, CIR);
+        grad.addColorStop(0, '#444');
+        grad.addColorStop(1, '#000');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(x, y, CIR, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 高光
+        ctx.fillStyle = 'rgba(255,255,255,0.15)';
+        ctx.beginPath();
+        ctx.arc(x - 6, y - 6, CIR * 0.3, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        // 白子
+        const grad = ctx.createRadialGradient(x - 5, y - 5, 3, x, y, CIR);
+        grad.addColorStop(0, '#fff');
+        grad.addColorStop(1, '#d0d0d0');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(x, y, CIR, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 描边让白棋在白背景上也看得清
+        ctx.strokeStyle = '#aaa';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(x, y, CIR - 1, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+  }
+
+  // 最后落子红圈标记
+  if (history.length > 0) {
+    const last = history[history.length - 1];
+    const { x, y } = getPos(last.row, last.col);
+    ctx.strokeStyle = '#ff4444';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(x, y, CIR - 2, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+
+canvas.addEventListener('click', (e) => {
+  if (gameOver) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = CANVAS / rect.width;
+  const scaleY = CANVAS / rect.height;
+  const mx = (e.clientX - rect.left) * scaleX;
+  const my = (e.clientY - rect.top) * scaleY;
+
+  // 找到最近的圆
+  let bestDist = Infinity;
+  let bestRow = -1, bestCol = -1;
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      const { x, y } = getPos(r, c);
+      const d = Math.sqrt((mx - x) ** 2 + (my - y) ** 2);
+      if (d < bestDist) {
+        bestDist = d;
+        bestRow = r;
+        bestCol = c;
+      }
+    }
+  }
+
+  if (bestDist > CIR + 5) return;
+  if (grid[bestRow][bestCol] !== null) return;
+
+  const color = blackTurn ? 'black' : 'white';
+  grid[bestRow][bestCol] = color;
+  history.push({ row: bestRow, col: bestCol, color });
+
+  if (checkWin(bestRow, bestCol, color)) {
+    gameOver = true;
+    statusEl.textContent = (color === 'black' ? '● 黑方' : '○ 白方') + ' 胜利！🎉';
+    drawBoard();
+    return;
+  }
+  if (history.length === SIZE * SIZE) {
+    gameOver = true;
+    statusEl.textContent = '平局！';
+    drawBoard();
+    return;
+  }
+  blackTurn = !blackTurn;
+  statusEl.textContent = blackTurn ? '● 黑方落子' : '○ 白方落子';
+  drawBoard();
+});
+
+function checkWin(row, col, color) {
+  const dirs = [[0,1],[1,0],[1,1],[1,-1]];
+  for (const [dr, dc] of dirs) {
+    let count = 1;
+    for (let i = 1; i < 5; i++) {
+      const r = row + dr * i, c = col + dc * i;
+      if (r >= 0 && r < SIZE && c >= 0 && c < SIZE && grid[r][c] === color) count++; else break;
+    }
+    for (let i = 1; i < 5; i++) {
+      const r = row - dr * i, c = col - dc * i;
+      if (r >= 0 && r < SIZE && c >= 0 && c < SIZE && grid[r][c] === color) count++; else break;
+    }
+    if (count >= 5) return true;
+  }
+  return false;
+}
+
+function undo() {
+  if (gameOver) gameOver = false;
+  if (history.length === 0) return;
+  const last = history.pop();
+  grid[last.row][last.col] = null;
+  blackTurn = (last.color === 'black');
+  statusEl.textContent = blackTurn ? '● 黑方落子' : '○ 白方落子';
+  drawBoard();
+}
+
+function restart() {
+  grid = Array(SIZE).fill(null).map(() => Array(SIZE).fill(null));
+  blackTurn = true;
+  gameOver = false;
+  history = [];
+  statusEl.textContent = '● 黑方落子';
+  drawBoard();
+}
+
+drawBoard();
+</script>
+</body>
+</html>

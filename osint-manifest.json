@@ -1,0 +1,20 @@
+{
+  "name": "CC的妙妙工具 - 网络谜踪 OSINT Toolkit",
+  "short_name": "妙妙工具",
+  "description": "日月位置·地磁偏角·阴影反推·星空参考·知识图鉴·航班高铁·照片分析 — 一站式网络谜踪地理定位工具",
+  "start_url": "/osint-toolkit.html",
+  "display": "standalone",
+  "background_color": "#0b0b18",
+  "theme_color": "#f0b830",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/osint-icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["utilities", "education", "productivity"],
+  "lang": "zh-CN"
+}
