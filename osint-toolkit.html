@@ -173,6 +173,13 @@ h4.sub-title{color:var(--accent2);margin-bottom:8px;font-size:14px}
       </div>
     </div>
     <div class="note">💡 照片里有太阳/月亮 → 方向+高度→定位。月亮同时出现在白天=上弦月前后，夜晚=下弦月前后。</div>
+    <!-- 太阳全轨迹图 -->
+    <h4 style="color:var(--accent2);margin-top:10px">☀️ 太阳全天轨迹</h4>
+    <canvas id="sunpath-canvas" width="400" height="160" style="width:100%;max-width:400px;border-radius:6px;background:#0a0a20;display:block;margin:6px auto"></canvas>
+    <div style="text-align:center;font-size:10px;color:var(--text2)">弧线=太阳路径 · 黄点=当前太阳位置 · 红色=日出/日落</div>
+    <!-- 月相月历 -->
+    <h4 style="color:var(--accent2);margin-top:8px">🌙 本月月相日历</h4>
+    <div id="moon-calendar" style="display:flex;flex-wrap:wrap;gap:3px;justify-content:center;margin-top:4px"></div>
   </div>
 </div>
 
@@ -273,6 +280,17 @@ h4.sub-title{color:var(--accent2);margin-bottom:8px;font-size:14px}
   </div>
 </div>
 
+n    <!-- 相机视场角 -->
+    <h4 style="color:var(--accent2);margin-top:10px">📷 相机视场角估算</h4>
+    <div class="row">
+      <div class="field"><label>焦距 (mm)</label><input id="fov-fl" value="24" class="w80"></div>
+      <div class="field"><label>传感器宽度 (mm)</label><input id="fov-sw" value="36" class="w80"></div>
+      <button class="btn btn-go btn-sm" onclick="calcFOV()">计算</button>
+    </div>
+    <div class="result-item" style="margin-top:4px"><div class="val sm" id="fov-result">--</div><div class="lbl">水平视场角 · 参考: 全画幅36mm / APS-C 24mm / 手机 4.5-7mm</div></div>
+  </div>
+</div>
+
 <!-- ==================== 5. 地磁偏角 ==================== -->
 <div class="tab-panel" id="panel-magnetic">
   <h3 class="panel-title">🧭 地磁偏角 — 指南针 vs 真北</h3>
@@ -356,7 +374,25 @@ h4.sub-title{color:var(--accent2);margin-bottom:8px;font-size:14px}
       </div>
     </div>
     <div style="flex:1;min-width:260px;">
-      <h3 class="panel-title">🌡️ 气候带判断</h3>
+      <h3 class="panel-title">🔍 反向搜图链接</h3>
+      <div class="note" style="margin-bottom:6px">照片里有可疑元素？一键生成各引擎搜图链接，在新标签页打开</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px" id="rev-search-links">
+        <button class="btn btn-go btn-sm" onclick="window.open('https://lens.google.com/uploadbyurl?url='+encodeURIComponent(prompt('粘贴图片URL:')))">🔍 Google Lens</button>
+        <button class="btn btn-go btn-sm" onclick="window.open('https://yandex.com/images/search?rpt=imageview&url='+encodeURIComponent(prompt('粘贴图片URL:')))">🔍 Yandex</button>
+        <button class="btn btn-go btn-sm" onclick="window.open('https://image.baidu.com/pcsearch?type=search&url='+encodeURIComponent(prompt('粘贴图片URL:')))">🔍 Baidu 识图</button>
+        <button class="btn btn-go btn-sm" onclick="window.open('https://tineye.com/search?url='+encodeURIComponent(prompt('粘贴图片URL:')))">🔍 TinEye</button>
+      </div>
+
+      <h3 class="panel-title">🔤 What3Words</h3>
+      <div class="row">
+        <div class="field"><label>纬度</label><input id="w3w-lat" value="39.9042" class="w100"></div>
+        <div class="field"><label>经度</label><input id="w3w-lng" value="116.4074" class="w100"></div>
+        <button class="btn btn-go btn-sm" onclick="genW3W()">生成链接</button>
+      </div>
+      <div class="result-item" style="text-align:left;margin-top:4px"><div class="val sm" style="font-size:12px;word-break:break-all" id="w3w-link"></div></div>
+      <div class="note">3m×3m精度的三词地址。在 what3words.com 地图上查看。</div>
+
+      <h3 class="panel-title" style="margin-top:10px">🌡️ 气候带判断</h3>
       <div class="row">
         <div class="field"><label>纬度</label><input id="clim-lat" value="39.9042" class="w100"></div>
         <button class="btn btn-go btn-sm" onclick="estClimate()">判断</button>
@@ -428,6 +464,12 @@ h4.sub-title{color:var(--accent2);margin-bottom:8px;font-size:14px}
     <div class="know-card"><h4>🔤 What3Words</h4><p>把地球分为 3m×3m 的方格，每格用 3 个英文单词表示。<br>例：白金汉宫 = <strong>///fees.sulk.hooks</strong><br>优点：易记、语音友好；缺点：封闭商业系统、不同语言不互通。<br><span class="tag">商业/非开源</span></p></div>
     <div class="know-card"><h4>📐 Geohash</h4><p>用 Base32 字母将经纬度编码为一维字符串。越长越精确。<br>例：北京 ≈ <strong>wx4g0bm</strong><br>特点：前缀相同的点位置相近，适合空间索引。<br><span class="tag">数据库/后端常用</span></p></div>
     <div class="know-card"><h4>🌍 投影与失真</h4><p>• <strong>墨卡托 (Web Mercator)：</strong>谷歌/OSM 使用 → 高纬度地区面积严重放大（格陵兰看起来像非洲大）<br>• <strong>等距圆柱投影：</strong>经纬度直接变 xy → 形状在高纬度压扁<br>• 看卫星图时注意：<strong>非正上方拍摄会有倾斜失真</strong></p></div>
+    <div class="know-card"><h4>🧮 MGRS/UTM 实时换算</h4>
+      <div class="row"><div class="field"><label>纬度</label><input id="mgrs-lat" value="39.9042" class="w100"></div>
+      <div class="field"><label>经度</label><input id="mgrs-lng" value="116.4074" class="w100"></div>
+      <button class="btn btn-go btn-sm" onclick="calcMGRS()">→ MGRS/UTM</button></div>
+      <div class="result-item" style="margin-top:4px"><div class="val sm" id="mgrs-result" style="font-size:12px"></div><div class="lbl">UTM 带号 + MGRS 网格</div></div>
+      <div class="note" id="mgrs-note"></div></div>
     <div class="know-card"><h4>📏 精度参考</h4><p>• 1° 纬度 ≈ <strong>111.32 km</strong>（恒定）<br>• 1° 经度 ≈ <strong>111.32 × cos(纬度) km</strong><br>• 0.001° ≈ 111m<br>• 0.00001° ≈ 1.1m<br>• DMS 1″ ≈ 30m（纬度）<br>• 4 位 MGRS ≈ 1km；10 位 ≈ 1m</p></div>
   </div>
 </div>
@@ -1207,6 +1249,10 @@ function updateSunMoon(){
   let mp=calcMoonPhase(y,m,d);
   document.getElementById('sm-moon-phase').textContent=mp.phaseName+' / '+(mp.illum*100).toFixed(0)+'%';
   document.getElementById('sm-moon-age').textContent=mp.age.toFixed(1)+' 天';
+  // 画太阳全轨迹
+  drawSunPath(lat,lng,y,m,d,tz);
+  // 画月相月历
+  drawMoonCalendar(y,m);
 
   // 月相图示
   let shadow=document.getElementById('moon-shadow-pic');
@@ -1217,6 +1263,84 @@ function updateSunMoon(){
 
   // Canvas 天球图
   drawSkyDome(sun.el,sun.az,moon.el,moon.az);
+}
+
+// 太阳全轨迹图
+function drawSunPath(lat,lng,y,m,d,tz){
+  let cv=document.getElementById('sunpath-canvas');if(!cv)return;
+  let ctx=cv.getContext('2d'),w=cv.width,h=cv.height;
+  ctx.clearRect(0,0,w,h);
+  let margin=30,R=h-margin*2,cx=w/2,cy=h-margin;
+  // 画地平线和坐标
+  ctx.strokeStyle='rgba(200,200,220,0.15)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(cx-R,cy);ctx.lineTo(cx+R,cy);ctx.stroke();
+  for(let alt=30;alt<=60;alt+=30){let r=R*alt/90;ctx.beginPath();ctx.arc(cx,cy,r,Math.PI,0);ctx.strokeStyle='rgba(200,200,220,0.06)';ctx.stroke()}
+  ctx.fillStyle='var(--text2)';ctx.font='9px '+getComputedStyle(document.body).fontFamily;
+  ctx.fillText('6h',cx-R+2,cy-4);ctx.fillText('12h',cx-10,4);ctx.fillText('18h',cx+R-18,cy-4);
+  // 画全天太阳轨迹
+  ctx.beginPath();let started=false;
+  for(let hh=0;hh<=24;hh+=0.3){
+    let utc=hh-tz,ud=d,um=m,uy=y;
+    while(utc<0){utc+=24;ud--}while(utc>=24){utc-=24;ud++}
+    let sun=calcSunPosition(lat,lng,uy,um,ud,hh,0,0,tz);
+    if(sun.el>0){
+      let r=R*(90-sun.el)/90,rad=(sun.az-90)*Math.PI/180;
+      let sx=cx+r*Math.cos(rad),sy=cy-r*Math.sin(rad);
+      if(sy>cy)sy=cy;if(sy<2)sy=2;
+      if(sx<cx-R)sx=cx-R;if(sx>cx+R)sx=cx+R;
+      if(!started){ctx.moveTo(sx,sy);started=true}else ctx.lineTo(sx,sy);
+    }
+  }
+  ctx.strokeStyle='rgba(240,184,48,0.5)';ctx.lineWidth=1.5;ctx.stroke();
+  // 画日出日落点
+  let sr=calcTwilight(lat,lng,y,m,d,tz,-0.833);
+  if(sr.type==='ok'){
+    for(let hh of [sr.e1,sr.e2]){
+      if(hh===null)continue;
+      let sun=calcSunPosition(lat,lng,y,m,d,Math.floor(hh),(hh%1)*60,0,tz);
+      if(sun.el>-2){
+        let r=R*(90-Math.max(0,sun.el))/90,rad=(sun.az-90)*Math.PI/180;
+        ctx.beginPath();ctx.arc(cx+r*Math.cos(rad),cy-r*Math.sin(rad),4,0,Math.PI*2);
+        ctx.fillStyle='#e94560';ctx.fill();
+      }
+    }
+  }
+  // 画当前太阳
+  let now=new Date();
+  let sun=calcSunPosition(lat,lng,y,m,d,now.getHours(),now.getMinutes(),0,tz);
+  if(sun.el>0){
+    let r=R*(90-sun.el)/90,rad=(sun.az-90)*Math.PI/180;
+    ctx.beginPath();ctx.arc(cx+r*Math.cos(rad),cy-r*Math.sin(rad),6,0,Math.PI*2);
+    ctx.fillStyle='#f0b830';ctx.fill();ctx.shadowColor='#f0b830';ctx.shadowBlur=12;ctx.fill();ctx.shadowBlur=0;
+  }
+}
+
+// 月相月历
+function drawMoonCalendar(year,month){
+  let div=document.getElementById('moon-calendar');if(!div)return;
+  div.innerHTML='';
+  let days=new Date(year,month,0).getDate();
+  for(let d=1;d<=days;d++){
+    let mp=calcMoonPhase(year,month,d);
+    let day=document.createElement('div');
+    day.style.cssText='width:22px;height:22px;border-radius:50%;background:#f5f5dc;position:relative;overflow:hidden;font-size:8px;text-align:center;line-height:22px;color:#333';
+    let shadow=document.createElement('div');
+    let dp=(1-mp.illum)*100;
+    shadow.style.cssText='position:absolute;top:0;bottom:0;background:#0b0b18;border-radius:50%';
+    if(mp.age<14.765){shadow.style.left='0';shadow.style.width=dp+'%';shadow.style.borderRadius='50% 0 0 50%'}
+    else{shadow.style.right='0';shadow.style.width=dp+'%';shadow.style.borderRadius='0 50% 50% 0'}
+    day.appendChild(shadow);
+    day.appendChild(document.createTextNode(d));
+    day.title=d+'日 '+mp.phaseName;
+    div.appendChild(day);
+  }
+}
+
+function calcFOV(){
+  let fl=parseFloat(document.getElementById('fov-fl').value),sw=parseFloat(document.getElementById('fov-sw').value);
+  if(isNaN(fl)||isNaN(sw)||fl<=0||sw<=0)return;
+  let fov=2*Math.atan(sw/(2*fl))*180/Math.PI;
+  document.getElementById('fov-result').textContent=fov.toFixed(1)+'° 水平视角';
 }
 
 function drawSkyDome(sunEl,sunAz,moonEl,moonAz){
@@ -1407,6 +1531,29 @@ function genMapLinks(){
     `<a href="https://earth.google.com/web/search/${c}" target="_blank" style="color:var(--accent2)">Google Earth</a> | `+
     `<a href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${c}" target="_blank" style="color:var(--accent2)">Street View</a> | `+
     `<a href="https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}" target="_blank" style="color:var(--accent2)">OSM</a>`;
+}
+function genW3W(){
+  let lat=parseFloat(document.getElementById('w3w-lat').value),lng=parseFloat(document.getElementById('w3w-lng').value);
+  if(isNaN(lat)||isNaN(lng))return;
+  let c=lat.toFixed(6)+','+lng.toFixed(6);
+  document.getElementById('w3w-link').innerHTML='<a href="https://what3words.com/pretty.failed.signal" target=_blank style=color:var(--accent2)>在 What3Words 地图查看: '+c+'</a>';
+}
+// MGRS/UTM 转换
+function calcMGRS(){
+  let lat=parseFloat(document.getElementById('mgrs-lat').value),lng=parseFloat(document.getElementById('mgrs-lng').value);
+  if(isNaN(lat)||isNaN(lng))return;
+  // UTM 带号
+  let zone=Math.floor((lng+180)/6)+1;
+  // UTM 横带字母
+  let band='CDEFGHJKLMNPQRSTUVWX'[Math.floor((lat+80)/8)];
+  if(band==='Y'&&zone===32&&lng>=3&&lng<12)band='X'; // 挪威例外
+  // MGRS 100km 方格
+  let e=Math.floor((lng+180)%6*100)%100;
+  let n=(lat+90)%8*100;
+  let col=String.fromCharCode(65+Math.floor(e/100)%24-(band>'M'?1:0));
+  let row=String.fromCharCode(65+Math.floor(n/100)%20);
+  document.getElementById('mgrs-result').textContent='UTM '+zone+band+' / MGRS '+zone+band+' '+col+row;
+  document.getElementById('mgrs-note').textContent='带号'+zone+' ('+((zone-1)*6-180).toFixed(0)+'°~'+((zone)*6-180).toFixed(0)+'°) · 横带'+band+' · 100km方格'+col+row;
 }
 function estClimate(){
   let lat=parseFloat(document.getElementById('clim-lat').value);
