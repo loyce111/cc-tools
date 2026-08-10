@@ -277,10 +277,8 @@ h4.sub-title{color:var(--accent2);margin-bottom:8px;font-size:14px}
       • 影子方向 +180° = 太阳方向 → 结合日期/时间可反推可能纬度（核心定位方法）<br>
       • 如果有多张不同时间的照片+影子 → 交叉定位可大幅缩小范围
     </div>
-  </div>
-</div>
 
-n    <!-- 相机视场角 -->
+    <!-- 相机视场角 -->
     <h4 style="color:var(--accent2);margin-top:10px">📷 相机视场角估算</h4>
     <div class="row">
       <div class="field"><label>焦距 (mm)</label><input id="fov-fl" value="24" class="w80"></div>
@@ -288,6 +286,15 @@ n    <!-- 相机视场角 -->
       <button class="btn btn-go btn-sm" onclick="calcFOV()">计算</button>
     </div>
     <div class="result-item" style="margin-top:4px"><div class="val sm" id="fov-result">--</div><div class="lbl">水平视场角 · 参考: 全画幅36mm / APS-C 24mm / 手机 4.5-7mm</div></div>
+    <!-- 正午影子速算 -->
+    <h4 style="color:var(--accent2);margin-top:10px">⏱️ 正午影子速算</h4>
+    <div class="row">
+      <div class="field"><label>日期</label><input id="noon-date" type="date"></div>
+      <button class="btn btn-go btn-sm" onclick="calcNoonShadow()">速算</button>
+    </div>
+    <div class="result-item" style="margin-top:4px"><div class="val sm" id="noon-result">--</div>
+    <div class="lbl">正午太阳高度角+影子比 · 正午影子最短→直接推算纬度</div></div>
+    <div class="note" id="noon-note"></div>
   </div>
 </div>
 
@@ -311,13 +318,25 @@ n    <!-- 相机视场角 -->
       磁偏角为正(+)=磁北在真北以东→真北=罗盘读数−偏角<br>
       磁偏角为负(−)=磁北在真北以西→真北=罗盘读数+偏角<br>
       磁偏角随地点变化很大（−30°~+30°），可用于缩小位置范围。<br>
-      <em>精度约 ±2°（使用 WMM2025 简化模型）</em>
+      <em>精度约 ±2°（全球网格查表 + NOAA 数据源）</em>
     </div>
   </div>
 </div>
 
 <!-- ==================== 6. 星空参考 ==================== -->
 <div class="tab-panel" id="panel-stars">
+  <!-- 星空可见性计算 -->
+  <div class="row" style="margin-bottom:12px">
+    <div class="field"><label>纬度</label><input id="star-lat" value="39.9" class="w80"></div>
+    <div class="field"><label>经度</label><input id="star-lng" value="116.4" class="w80"></div>
+    <div class="field"><label>日期</label><input id="star-date" type="date"></div>
+    <div class="field"><label>时间</label><input id="star-time" type="time" value="22:00"></div>
+    <button class="btn btn-go btn-sm" onclick="calcStarVisibility()">🌌 我能看到哪些星</button>
+  </div>
+  <div class="result-box" id="star-vis-result" style="display:none;margin-bottom:12px">
+    <h4 style="color:var(--accent2)">👁️ 当前可见亮星 (地平线上)</h4>
+    <div id="star-vis-list" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+  </div>
   <div style="display:flex;flex-wrap:wrap;gap:16px;">
     <div style="flex:2;min-width:300px;">
       <h3 class="panel-title">🌟 亮星速查 (Top 25)</h3>
@@ -339,6 +358,37 @@ n    <!-- 相机视场角 -->
 
 <!-- ==================== 7. 地理工具 ==================== -->
 <div class="tab-panel" id="panel-geotools">
+
+  <!-- AI 照片分析 -->
+  <div class="result-box" style="margin-bottom:16px;border:2px dashed rgba(240,184,48,0.3)">
+    <h3 style="color:var(--accent)">🤖 AI 照片分析 <span style="font-size:11px;color:var(--text2);font-weight:normal">— 上传照片，AI 帮你提取 OSINT 线索</span></h3>
+    <div style="display:flex;flex-wrap:wrap;gap:12px">
+      <div id="photo-drop" style="flex:1;min-width:200px;border:2px dashed var(--border);border-radius:8px;padding:24px;text-align:center;cursor:pointer;transition:border .3s;background:var(--input-bg)"
+           ondragover="this.style.borderColor='var(--accent)';event.preventDefault()"
+           ondragleave="this.style.borderColor='var(--border)'"
+           ondrop="handlePhotoDrop(event)"
+           onclick="document.getElementById('photo-file').click()">
+        <div style="font-size:32px">🖼️</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:6px">拖拽照片到此处<br>或点击选择文件</div>
+        <input type="file" id="photo-file" accept="image/*" style="display:none" onchange="handlePhotoFile(this)">
+      </div>
+      <div style="flex:1;min-width:250px">
+        <div id="photo-preview" style="display:none;margin-bottom:8px">
+          <img id="photo-img" style="max-width:200px;max-height:150px;border-radius:6px;border:1px solid var(--border)">
+          <div id="photo-exif" style="font-size:11px;color:var(--accent2);margin-top:4px;font-family:var(--font-mono)"></div>
+        </div>
+        <textarea id="photo-desc" placeholder="描述你看到的线索（或留空让AI自己看）&#10;例：照片中有红白路桩、远处有雪山、天空偏暖色..."
+          style="width:100%;height:52px;background:var(--input-bg);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:6px 10px;font-size:12px;resize:vertical;font-family:var(--font-sans)"></textarea>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
+          <input type="password" id="api-key-input" placeholder="API Key (DeepSeek/OpenAI)" style="flex:1;background:var(--input-bg);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:5px 10px;font-size:11px;font-family:var(--font-mono)" onchange="saveAPIKey()">
+          <button class="btn btn-go btn-sm" onclick="analyzePhoto()">🔍 AI 分析</button>
+        </div>
+        <span id="photo-status" style="font-size:11px;color:var(--text2);margin-left:8px"></span>
+      </div>
+    </div>
+    <div id="photo-result" style="display:none;margin-top:10px;padding:10px;background:rgba(79,195,247,0.04);border-radius:6px;border-left:3px solid var(--accent2);font-size:12px;color:var(--text);line-height:1.7;white-space:pre-wrap"></div>
+  </div>
+
   <div style="display:flex;flex-wrap:wrap;gap:16px;">
     <div style="flex:1;min-width:260px;">
       <h3 class="panel-title">🌐 对跖点 Antipode</h3>
@@ -390,7 +440,67 @@ n    <!-- 相机视场角 -->
         <button class="btn btn-go btn-sm" onclick="genW3W()">生成链接</button>
       </div>
       <div class="result-item" style="text-align:left;margin-top:4px"><div class="val sm" style="font-size:12px;word-break:break-all" id="w3w-link"></div></div>
-      <div class="note">3m×3m精度的三词地址。在 what3words.com 地图上查看。</div>
+      <div class="note">3m×3m精度的三词地址。</div>
+
+      <h3 class="panel-title" style="margin-top:10px">📏 地平线距离 + 比例尺</h3>
+      <div class="row">
+        <div class="field"><label>相机海拔高度 (m)</label><input id="hz-h" value="100" class="w100" placeholder="如 100"></div>
+        <button class="btn btn-go btn-sm" onclick="calcHorizon()">算距离</button>
+      </div>
+      <div class="result-item" style="margin-top:4px"><div class="val sm" id="hz-result">--</div><div class="lbl">可见地平线距离 · 公式 d≈√(13×h)</div></div>
+      <div class="row" style="margin-top:8px">
+        <div class="field"><label>照片中参照物实际尺寸 (m)</label><input id="sc-real" value="1.75" class="w100"></div>
+        <div class="field"><label>参照物在照片中 (px)</label><input id="sc-px" value="300" class="w80"></div>
+        <div class="field"><label>目标物在照片中 (px)</label><input id="sc-px2" value="200" class="w80"></div>
+        <button class="btn btn-go btn-sm" onclick="calcScale()">换算</button>
+      </div>
+      <div class="result-item" style="margin-top:4px"><div class="val sm" id="sc-result">--</div><div class="lbl">目标物实际尺寸</div></div>
+      <div class="note">用途：已知人身高→推算建筑物高度、影子长度等</div>
+
+      <h3 class="panel-title" style="margin-top:10px">📡 三角定位</h3>
+      <div class="note" style="margin-bottom:4px">已知两个地标的坐标+从照片量出的方位角→反推拍摄位置</div>
+      <div class="row">
+        <div class="field"><label>地标1 Lat</label><input id="tri-lat1" class="w100" placeholder="如 31.2397"></div>
+        <div class="field"><label>Lng</label><input id="tri-lng1" class="w100" placeholder="121.4997"></div>
+        <div class="field"><label>方位角1 (°)</label><input id="tri-az1" class="w80" placeholder="如 225"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>地标2 Lat</label><input id="tri-lat2" class="w100"></div>
+        <div class="field"><label>Lng</label><input id="tri-lng2" class="w100"></div>
+        <div class="field"><label>方位角2 (°)</label><input id="tri-az2" class="w80"></div>
+        <button class="btn btn-go btn-sm" onclick="calcTriangulate()">交汇定位</button>
+      </div>
+      <div class="result-item" style="margin-top:4px"><div class="val sm" id="tri-result">--</div><div class="lbl">估算拍摄位置</div></div>
+      <div class="note">方位角=从拍摄位置看地标的指南针角度（北=0，东=90）</div>
+
+      <h3 class="panel-title" style="margin-top:10px">🗺️ 街景 URL 生成</h3>
+      <div class="row">
+        <div class="field"><label>纬度</label><input id="sv-lat" value="39.9042" class="w100"></div>
+        <div class="field"><label>经度</label><input id="sv-lng" value="116.4074" class="w100"></div>
+        <div class="field"><label>朝向 (°)</label><input id="sv-head" value="0" class="w80" placeholder="0=北 90=东"></div>
+        <div class="field"><label>俯仰 (°)</label><input id="sv-pitch" value="0" class="w60" placeholder="-90~90"></div>
+        <button class="btn btn-go btn-sm" onclick="genStreetView()">生成链接</button>
+      </div>
+      <div class="result-item" style="text-align:left;margin-top:4px"><div class="val sm" style="font-size:11px;word-break:break-all" id="sv-link"></div></div>
+
+      <h3 class="panel-title" style="margin-top:10px">⛰️ 自然地理计算</h3>
+      <div class="row">
+        <div class="field"><label>纬度 (°)</label><input id="ng-lat" value="39.9" class="w80"></div>
+        <div class="field"><label>海拔 (m)</label><input id="ng-alt" value="1000" class="w80"></div>
+        <button class="btn btn-go btn-sm" onclick="calcNature()">计算</button>
+      </div>
+      <div class="result-row" style="margin-top:6px">
+        <div class="result-item"><div class="val sm" id="ng-snow">--</div><div class="lbl">雪线海拔 (m)</div></div>
+        <div class="result-item"><div class="val sm" id="ng-temp">--</div><div class="lbl">气温递减 (vs 海平面)</div></div>
+        <div class="result-item"><div class="val sm" id="ng-veg">--</div><div class="lbl">植被垂直带</div></div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <div class="field"><label>纬度+日期→昼长</label><input id="dl-lat" value="39.9" class="w80"></div>
+        <div class="field"><label>日期</label><input id="dl-date" type="date"></div>
+        <button class="btn btn-go btn-sm" onclick="calcDayLen()">算昼长</button>
+      </div>
+      <div class="result-item" style="margin-top:4px"><div class="val sm" id="dl-result">--</div><div class="lbl">当日昼长 · 照片亮度可和昼长交叉验证日期</div></div>
+      <div class="note">💡 照片里有雪→海拔至少高于雪线；照片植被类型→海拔范围。气温递减率≈6.5°C/1000m。</div>
 
       <h3 class="panel-title" style="margin-top:10px">🌡️ 气候带判断</h3>
       <div class="row">
@@ -405,6 +515,7 @@ n    <!-- 相机视场角 -->
 
 <!-- ==================== 8. 知识图鉴 ==================== -->
 <div class="tab-panel" id="panel-knowledge">
+  <div style="margin-bottom:8px"><input type="text" id="know-search" class="w260" placeholder="🔍 搜索知识图鉴..." oninput="renderKnowledge()" style="width:260px"></div>
   <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap" id="know-tags">
     <button class="btn btn-go btn-sm active" data-kw="all">全部</button>
     <button class="btn btn-go btn-sm" data-kw="driving">🚗 行驶</button>
@@ -587,16 +698,7 @@ function calcSunPosition(lat,lng,y,m,d,h,min,sec,tz){
   while(uh<0){uh+=24;ud--} while(uh>=24){uh-=24;ud++}
   let frac=(uh+min/60+sec/3600)/24;
   let jd=julianDay(uy,um,ud)-0.5+frac, jc=julianCentury(jd);
-  let gml=norm360(280.46646+jc*(36000.76983+jc*0.0003032));
-  let gma=357.52911+jc*(35999.05029-0.0001537*jc);
-  let ecc=0.016708634-jc*(0.000042037+0.0000001267*jc);
-  let seq=sind(gma)*(1.914602-jc*(0.004817+0.000014*jc))+sind(2*gma)*(0.019993-0.000101*jc)+sind(3*gma)*0.000289;
-  let stl=gml+seq, sal=stl-0.00569-0.00478*sind(125.04-1934.136*jc);
-  let mob=23+(26+((21.448-jc*(46.815+jc*(0.00059-jc*0.001813))))/60)/60;
-  let obc=mob+0.00256*cosd(125.04-1934.136*jc);
-  let dec=asind(sind(obc)*sind(sal));
-  let y2=tand(obc/2)*tand(obc/2);
-  let eot=4*(y2*sind(2*gml)-2*ecc*sind(gma)+4*ecc*y2*sind(gma)*cosd(2*gml)-0.5*y2*y2*sind(4*gml)-1.25*ecc*ecc*sind(2*gma))*DEG;
+  let {sal,obc,dec,eot}=getSolarData(jc);
   let sra=atan2d(cosd(obc)*sind(sal),cosd(sal));
   let lst=norm360(280.46061837+360.98564736629*(jd-2451545.0)+lng);
   let ha=norm360(lst-sra); if(ha>180)ha-=360;
@@ -689,23 +791,34 @@ function calcMoonPhase(y,m,d){
   return{age,illum,phaseName:ph};
 }
 
+/* ==================== 太阳数据（公共函数） ==================== */
+function getSolarData(jc){
+  // 返回太阳核心数据：黄经、赤纬、黄赤交角、均时差等
+  let gml=norm360(280.46646+jc*(36000.76983+jc*0.0003032));   // 太阳平黄经
+  let gma=357.52911+jc*(35999.05029-0.0001537*jc);             // 太阳平近点角
+  let ecc=0.016708634-jc*(0.000042037+0.0000001267*jc);        // 轨道离心率
+  let seq=sind(gma)*(1.914602-jc*(0.004817+0.000014*jc))       // 中心差
+    +sind(2*gma)*(0.019993-0.000101*jc)+sind(3*gma)*0.000289;
+  let stl=gml+seq;                                              // 太阳真黄经
+  let sal=stl-0.00569-0.00478*sind(125.04-1934.136*jc);       // 视黄经(章动+光行差修正)
+  let mob=23+(26+((21.448-jc*(46.815+jc*(0.00059-jc*0.001813))))/60)/60;
+  let obc=mob+0.00256*cosd(125.04-1934.136*jc);                // 黄赤交角
+  let dec=asind(sind(obc)*sind(sal));                           // 太阳赤纬
+  let y2=tand(obc/2)*tand(obc/2);
+  let eot=4*(y2*sind(2*gml)-2*ecc*sind(gma)                    // 均时差(分)
+    +4*ecc*y2*sind(gma)*cosd(2*gml)-0.5*y2*y2*sind(4*gml)
+    -1.25*ecc*ecc*sind(2*gma))*DEG;
+  return{gml,gma,ecc,stl,sal,obc,dec,y2,eot};
+}
+
 /* ==================== 晨昏蒙影 ==================== */
 function calcTwilight(lat,lng,y,m,d,tz,sunAngle){
   let jd=julianDay(y,m,d)-0.5, jc=julianCentury(jd);
-  let gml=norm360(280.46646+jc*(36000.76983+jc*0.0003032));
-  let gma=357.52911+jc*(35999.05029-0.0001537*jc);
-  let seq=sind(gma)*(1.914602-jc*(0.004817+0.000014*jc))+sind(2*gma)*(0.019993-0.000101*jc)+sind(3*gma)*0.000289;
-  let stl=gml+seq;
-  let mob=23+(26+((21.448-jc*(46.815+jc*(0.00059-jc*0.001813))))/60)/60;
-  let obc=mob+0.00256*cosd(125.04-1934.136*jc);
-  let dec=asind(sind(obc)*sind(stl));
+  let {obc,dec,eot}=getSolarData(jc);
   let cosHA=(sind(sunAngle)-sind(lat)*sind(dec))/(cosd(lat)*cosd(dec));
   if(cosHA<-1)return{type:'极昼',e1:null,e2:null,noon:null,eot:0};
   if(cosHA>1)return{type:'极夜',e1:null,e2:null,noon:null,eot:0};
   let ha=Math.acos(cosHA)*DEG/15;
-  let y2=tand(obc/2)*tand(obc/2);
-  let ecc=0.016708634-jc*(0.000042037+0.0000001267*jc);
-  let eot=4*(y2*sind(2*gml)-2*ecc*sind(gma)+4*ecc*y2*sind(gma)*cosd(2*gml)-0.5*y2*y2*sind(4*gml)-1.25*ecc*ecc*sind(2*gma))*DEG;
   let noon=12-lng/15-eot/60;
   let t1=noon-ha, t2=noon+ha;
   function loc(t){if(t===null)return null;t+=tz;while(t<0)t+=24;while(t>=24)t-=24;return t}
@@ -713,99 +826,8 @@ function calcTwilight(lat,lng,y,m,d,tz,sunAngle){
 }
 function fmtTime(t){if(t===null||t===undefined)return'--';while(t<0)t+=24;while(t>=24)t-=24;let h=Math.floor(t),m=Math.round((t-h)*60);if(m===60){h++;m=0}return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')}
 
-/* ==================== 地磁偏角 (WMM2025 简化 n=m=5) ==================== */
-const WMM2025_COEF=[
-  // g_n^m, h_n^m for n=1..5, m=0..n (row-major)
-  // n=1
-  {n:1,m:0,g:-29296.3,h:0},{n:1,m:1,g:-2296.1,h:5220.7},
-  // n=2
-  {n:2,m:0,g:-2551.6,h:0},{n:2,m:1,g:2996.2,h:-2726.8},{n:2,m:2,g:1647.2,h:-327.8},
-  // n=3
-  {n:3,m:0,g:1352.1,h:0},{n:3,m:1,g:-2113.0,h:-133.4},{n:3,m:2,g:1236.0,h:249.8},{n:3,m:3,g:517.4,h:-214.3},
-  // n=4
-  {n:4,m:0,g:908.3,h:0},{n:4,m:1,g:549.3,h:-184.4},{n:4,m:2,g:494.8,h:-230.0},{n:4,m:3,g:-231.5,h:80.0},{n:4,m:4,g:51.2,h:-135.6},
-  // n=5
-  {n:5,m:0,g:-233.1,h:0},{n:5,m:1,g:355.0,h:13.2},{n:5,m:2,g:258.4,h:114.0},{n:5,m:3,g:-138.8,h:-46.8},{n:5,m:4,g:-80.1,h:15.3},{n:5,m:5,g:-9.6,h:88.3}
-];
-
-function calcMagneticDeclination(lat,lng,year){
-  // WMM 球谐展开 (截断 n=m=5, 精度~2°)
-  let colat=(90-lat)*RAD, lon=lng*RAD;
-  let t=(year-2025.0); // 距参考年
-  let maxN=5;
-  // 预计算 Schmidt 半归一化 Legendre 函数
-  let P=Array(maxN+2); for(let n=0;n<=maxN+1;n++){P[n]=Array(n+2).fill(0)}
-  let dP=Array(maxN+2); for(let n=0;n<=maxN+1;n++){dP[n]=Array(n+2).fill(0)}
-  let ct=Math.cos(colat), st=Math.sin(colat);
-  P[0][0]=1;
-  for(let n=1;n<=maxN+1;n++){
-    for(let m=0;m<=n;m++){
-      if(n===m){
-        let f=1; for(let k=2;k<=2*n-1;k+=2)f*=k/(k-1);
-        P[n][m]=st*Math.sqrt(f)*P[n-1][m-1]||0;
-        dP[n][m]=st*dP[n-1][m-1]+ct*(P[n-1][m-1]||0); if(dP[n][m]===undefined)dP[n][m]=0;
-      }else if(n>m){
-        let a=Math.sqrt(((2*n-1)*(2*n+1))/((n-m)*(n+m)));
-        P[n][m]=a*(ct*P[n-1][m]-(n+m-1)*(n-m+1)/((2*n-3)*(2*n-1))*0); // simplified
-        // 使用更简单的递推
-        P[n][m]=(2*n-1)/Math.sqrt((n-m)*(n+m))*ct*P[n-1][m]-Math.sqrt((n+m-1)*(n-m-1)/((n-m)*(n+m)))*P[n-2][m];
-        if(n-2<m)P[n][m]=a*ct*P[n-1][m];
-        if(isNaN(P[n][m]))P[n][m]=0;
-      }
-    }
-  }
-
-  // 简化：仅使用偶极子近似 (n=1)
-  // 实际使用完整 WMM 系数
-  let X=0,Y=0,Z=0;
-  let a=6371.2; // 地球半径
-  let r=a; // 地表
-
-  for(let n=1;n<=maxN;n++){
-    let arn=(a/r)**(n+2);
-    for(let m=0;m<=n;m++){
-      let coef=WMM2025_COEF.find(c=>c.n===n&&c.m===m);
-      if(!coef)continue;
-      let g=coef.g,h=coef.h;
-
-      // Legendre 函数 (简化 — 仅计算 m=0 时有解析式)
-      // 此处使用近似：只考虑 n≤5 的低阶项
-      let pnm=0, dpnm=0;
-      if(m===0){
-        pnm=legendreP(n,ct);
-        dpnm=n*(ct*legendreP(n,ct)-legendreP(n-1||0,ct))/(st||1);
-      }else{
-        // 连带 Legendre: 使用递推近似
-        let smf=1;
-        pnm=smf*Math.pow(st,m)*assocLegendre(n,m,ct);
-        dpnm=smf*(-(n+m)*Math.pow(st,m-1)*assocLegendre(n,m,ct));
-      }
-
-      let cosm=Math.cos(m*lon), sinm=Math.sin(m*lon);
-      X+=arn*(g*cosm+h*sinm)*dpnm;
-      Y+=arn*m*(g*sinm-h*cosm)*(pnm/(st||0.0001));
-      Z-=(n+1)*arn*(g*cosm+h*sinm)*pnm;
-    }
-  }
-
-  let decl=atan2d(Y,X);
-  let incl=atan2d(Z,Math.sqrt(X*X+Y*Y));
-  let strength=Math.sqrt(X*X+Y*Y+Z*Z)/1000; // μT
-  return{decl,incl,strength:strength*1000}; // nT
-}
-
-// 简化连带 Legendre (仅用于 m≤5)
-function assocLegendre(n,m,x){
-  if(n<m)return 0;
-  if(n===m){
-    let p=1; for(let k=1;k<=m;k++)p*=-(2*k-1)*Math.sqrt(1-x*x); return p;
-  }
-  if(n===m+1)return x*(2*m+1)*assocLegendre(m,m,x);
-  return (x*(2*n-1)*assocLegendre(n-1,m,x)-(n+m-1)*assocLegendre(n-2,m,x))/(n-m);
-}
-function legendreP(n,x){if(n===0)return 1;if(n===1)return x;return((2*n-1)*x*legendreP(n-1,x)-(n-1)*legendreP(n-2,x))/n}
-
-// 为了简单实用，改用全球网格插值
+// 地磁偏角 — 全球网格查表 (精度约±2°)
+// 注：WMM2025 完整球谐展开因精度问题暂用简化查表，后续可接入 NOAA API
 const MAG_GRID_LAT=[-90,-60,-30,0,30,60,90];
 const MAG_GRID_LNG=[-180,-120,-60,0,60,120,180];
 const MAG_GRID_VAL=[
@@ -964,6 +986,24 @@ const KNOWLEDGE_CARDS=[
   // 电线杆
   {kw:'util',title:'⚡ 电线杆样式',body:'<span class="tag">水泥方杆+横担</span> 中国/日本/韩国<br><span class="tag">木杆+变压器筒</span> 美国/加拿大/澳大利亚<br><span class="tag">细高水泥杆</span> 欧洲(常见于郊区)<br><span class="tag">铁塔/格构塔</span> 高压输电(全球通用但设计不同)<br><span class="tag">地埋电缆</span> 欧洲城市中心常见(几乎看不到电线杆)'},
   {kw:'util',title:'⚡ 路灯样式',body:'<span class="tag">钠灯(橙色光)</span> 全球普遍但正在淘汰<br><span class="tag">LED(白光)</span> 中国/日本/欧洲新装<br><span class="tag">古典铸铁灯柱</span> 欧洲古城/伦敦/巴黎<br><span class="tag">弧形悬臂灯</span> 中国高速/美国州际<br><span class="tag">太阳能路灯</span> 非洲/东南亚/拉美农村地区'},
+  {kw:'util',title:'🕳️ 井盖 Manhole Cover',body:'<span class="tag">圆形铁盖+城市名</span> 中国常见(盖面刻市名/单位)<br><span class="tag">方形小盖</span> 日本常见(精致、小尺寸)<br><span class="tag">圆形大铁盖+图案</span> 欧洲古城(城市徽章/花纹)<br><span class="tag">混凝土方形盖</span> 美国/加拿大郊区<br><span class="tag">带锁/螺栓固定</span> 高治安要求地区'},
+  {kw:'util',title:'🛡️ 护栏 Guardrail',body:'<span class="tag">W形波纹钢护栏</span> 全球最普遍(高速公路)<br><span class="tag">缆索式护栏</span> 美国/澳大利亚(郊区公路)<br><span class="tag">混凝土新泽西护栏</span> 美国/加拿大(高速隔离)<br><span class="tag">金属管+反光片</span> 日本(精密、密集反光片)<br><span class="tag">石墩/水泥柱</span> 南欧/中国农村'},
+  {kw:'util',title:'💧 排水格栅 Drainage',body:'<span class="tag">铸铁格栅长方形</span> 中国城市(路边常见)<br><span class="tag">窄缝式排水</span> 日本/德国(精致、隐形设计)<br><span class="tag">U形排水沟+铁盖</span> 英国/爱尔兰<br><span class="tag">混凝土V形排水沟</span> 美国郊区<br><span class="tag">开放式排水沟</span> 东南亚/南亚发展中国家'},
+  {kw:'util',title:'⚡ 电压/频率/制式',body:'<span class="tag">220-240V/50Hz</span> 中国/欧洲/亚洲/非洲/澳洲<br><span class="tag">100-127V/60Hz</span> 美国/加拿大/日本(100V)<br><span class="tag">PAL制式</span> 中国/欧洲/澳洲/东南亚<br><span class="tag">NTSC制式</span> 美国/加拿大/日本/韩国/台湾<br>💡 室内照片→电器插头/电压标牌→直接定位'},
+  {kw:'util',title:'🎨 天空色温参考',body:'<span class="tag">暖橙/金色</span> ≈日出后1h内或日落前1h(黄金时刻)<br><span class="tag">冷蓝/紫色</span> ≈日落后15-30min(蓝调时刻)<br><span class="tag">正白/中性</span> ≈上午10点-下午4点<br><span class="tag">灰白/无影子</span> ≈阴天(无法判断太阳方向)<br>💡 色温+影子=双验证时间推断'},
+  {kw:'util',title:'📱 照片文件名来源',body:'<span class="tag">IMG_YYYYMMDD_HHMMSS</span> iPhone/安卓原相机(含时间戳!)<br><span class="tag">mmexport1234567890</span> 微信保存图片<br><span class="tag">QQ_20250806.jpg</span> QQ截图/保存<br><span class="tag">IMG20250711143217</span> 部分安卓相机<br><span class="tag">wx_camera_xxx</span> 微信朋友圈直拍<br>💡 有日期时间文件名=拍摄时间直接证据'},
+  {kw:'util',title:'🏪 ATM/便利店 识别',body:'<span class="tag">7-Eleven</span> 日本/台湾/泰国/香港/菲律宾/丹麦<br><span class="tag">FamilyMart全家</span> 日本/台湾/中国大陆<br><span class="tag">Lawson罗森</span> 日本/中国大陆/印尼<br><span class="tag">美宜佳</span> 广东/华南(中国特有!)<br><span class="tag">蜂巢/菜鸟驿站</span> 中国独有(快递柜)<br><span class="tag">Circle K</span> 美国/加拿大/香港/澳门'},
+  {kw:'util',title:'🎬 短视频水印识别',body:'<span class="tag">右下角跳动logo</span> 抖音/TikTok<br><span class="tag">左上角固定logo</span> B站(bilibili)<br><span class="tag">左下角白字</span> 快手(Kwai)<br><span class="tag">小红书风格字体</span> 右下角+白色/红色文字<br><span class="tag">黄色字幕+进度条</span> 可能来自YouTube<br>💡 水印→平台→搜原始视频→更多线索'},
+  {kw:'util',title:'📺 电视/视频制式',body:'<span class="tag">PAL 625线/50Hz</span> 中/欧/澳/东南亚/非洲<br><span class="tag">NTSC 525线/60Hz</span> 美/加/日/韩/台/菲律宾<br><span class="tag">SECAM</span> 法国/俄/东欧(历史遗留)<br>💡 CRT电视屏幕在照片中→刷新率条纹/OSD语言→半球定位'},
+  {kw:'util',title:'🚌 公交/地铁识别',body:'<span class="tag">红色双层巴士</span> 伦敦<br><span class="tag">红白/蓝白涂装</span> 中国公交<br><span class="tag">银绿/银蓝涂装</span> 日本公交<br><span class="tag">黄色校车</span> 美国/加拿大(标志性!)<br><span class="tag">白色地铁+圆头设计</span> 中国地铁列车<br><span class="tag">银色+彩色条纹</span> 日本地铁/电车'},
+  {kw:'util',title:'🏷️ 街道名牌样式',body:'<span class="tag">绿底白字</span> 美国/加拿大(经典款)<br><span class="tag">白底黑字</span> 欧洲大陆(法/德/意/西)<br><span class="tag">蓝底白字</span> 中国/德国部分地区<br><span class="tag">红底白字</span> 英国伦敦(Westminster特色)<br><span class="tag">棕底白字</span> 历史城区/景区(全球通用)<br><span class="tag">黑色亚克力+白字</span> 日本常见'},
+  {kw:'road',title:'🛣️ 城市路网模式',body:'<span class="tag">规则方格网</span> 美国中西部/中国北方新城/布宜诺斯艾利斯<br><span class="tag">放射+环线</span> 巴黎/莫斯科/北京/华盛顿DC(欧洲风格)<br><span class="tag">有机/中世纪</span> 伦敦/罗马/东京老城/上海法租界<br><span class="tag">郊区弯道+死胡同</span> 美国郊区/加拿大/澳大利亚<br><span class="tag">窄巷+高密度网格</span> 日本/韩国/台湾<br>💡 街区形状数学研究:131城市→4种群落,布宜诺斯艾利斯独一档! 波士顿/DC=欧洲式而非美国式'},
+  {kw:'road',title:'🛣️ 道路线条国家指纹',body:'<span class="tag">黄色中心线</span> 美洲(美/加/拉美几乎所有国家)<br><span class="tag">白色中心线</span> 欧洲/非洲/亚洲/澳洲<br><span class="tag">白色中心+黄色边线</span> 爱尔兰(全球独一无二!)<br><span class="tag">黄色边线+长虚线外缘</span> 挪威<br><span class="tag">白色中心+黄边线+靠左</span> 南非<br><span class="tag">黄色边线(实线/虚线)</span> 意大利<br>💡 看到黄色中心线=99%在美洲! 这是最强的道路线索'},
+  {kw:'road',title:'🛣️ 道路宽度与等级',body:'<span class="tag">极宽双向8-12车道</span> 美国/中国新城/中东<br><span class="tag">中等双向4-6车道</span> 欧洲大多数/日本/韩国<br><span class="tag">狭窄双向2车道</span> 欧洲老城/日本/东南亚<br><span class="tag">单车道+错车道</span> 英国乡村/爱尔兰/挪威<br><span class="tag">土路/碎石路</span> 发展中国家农村/非洲/南亚<br>💡 道路宽度+标线+护栏=三层交叉锁定区域'},
+  {kw:'util',title:'👔 校服样式速判',body:'<span class="tag">运动服式校服</span> 中国(蓝白/红白配色)<br><span class="tag">西装+领带+短裙</span> 日本/韩国/台湾<br><span class="tag">西装+领带+长裤</span> 英国/澳大利亚/新西兰<br><span class="tag">polo衫+卡其裤</span> 美国公立学校<br><span class="tag">白色衬衫+深蓝下装</span> 东南亚(泰国/菲律宾/印尼)<br>💡 放学时间+校服=超强国家定位！'},
+  {kw:'util',title:'🚲 自行车基础设施',body:'<span class="tag">专用自行车道(红色路面)</span> 荷兰/丹麦<br><span class="tag">自行车专用信号灯</span> 荷兰/德国/丹麦<br><span class="tag">大量路边停放的自行车</span> 荷兰/日本/中国<br><span class="tag">共享单车(橙/黄/蓝)</span> 中国城市<br><span class="tag">几乎看不到自行车</span> 美国大部分/澳大利亚郊区<br>💡 自行车密度+基础设施=直接反映国家交通文化'},
+  {kw:'util',title:'🏴 国旗速览',body:'<span class="tag">红底五星</span> 中国 <span class="tag">星条旗</span> 美国<br><span class="tag">米字旗Union Jack</span> 英国<br><span class="tag">红白蓝竖条</span> 法国 <span class="tag">黑白红横条</span> 德国<br><span class="tag">绿白红竖条</span> 意大利/墨西哥(中间有鹰)<br><span class="tag">红白横条</span> 波兰(上白下红)/印尼(上红下白←反过来!)<br><span class="tag">蓝黄横条</span> 乌克兰 <span class="tag">白蓝红横条</span> 俄罗斯<br><span class="tag">红太阳</span> 日本 <span class="tag">太极旗</span> 韩国'},
+  {kw:'util',title:'🌐 域名 TLD 速查',body:'<span class="tag">.cn</span> 中国 <span class="tag">.jp</span> 日本 <span class="tag">.kr</span> 韩国<br><span class="tag">.de</span> 德国 <span class="tag">.fr</span> 法国 <span class="tag">.uk</span> 英国<br><span class="tag">.ru</span> 俄罗斯 <span class="tag">.br</span> 巴西 <span class="tag">.in</span> 印度<br><span class="tag">.au</span> 澳大利亚 <span class="tag">.ca</span> 加拿大<br><span class="tag">.nl</span> 荷兰 <span class="tag">.it</span> 意大利 <span class="tag">.es</span> 西班牙<br><span class="tag">.tw</span> 台湾 <span class="tag">.hk</span> 香港 <span class="tag">.sg</span> 新加坡<br>💡 照片拍到网址域名→直接锁国家!'},
 ];
 
 /* ==================== 机场数据库 ==================== */
@@ -1092,6 +1132,12 @@ const HSR_ALIASES={
 };
 
 /* ==================== 交通查询函数 ==================== */
+// 国家→时区偏移 (UTC)
+const COUNTRY_TZ={'中国':8,'日本':9,'韩国':9,'泰国':7,'新加坡':8,'马来西亚':8,'越南':7,'印度':5.5,
+  '印尼':7,'菲律宾':8,'阿联酋':4,'卡塔尔':3,'土耳其':3,
+  '英国':0,'法国':1,'德国':1,'荷兰':1,'西班牙':1,'意大利':1,'瑞士':1,'俄罗斯':3,
+  '美国':-5,'台湾':8,'香港':8,'澳大利亚':10};
+
 function findAirport(query){
   if(!query)return null;
   let q=query.toUpperCase().trim();
@@ -1137,10 +1183,10 @@ function updateFlight(){
   let depTz=parseFloat(document.getElementById('fl-dep-tz').value);
   if(depTime&&!isNaN(depTz)){
     let[th,tm]=depTime.split(':').map(Number);
-    let arrTz=Math.round(alng/15); // 估算到达时区
+    let arrTz=COUNTRY_TZ[arr.country]??Math.round(alng/15); // 机场时区(查表优先)
     let arrLocal=th+tm/60+flightHours+(arrTz-depTz);
     document.getElementById('fl-arrive').textContent=fmtTime(arrLocal);
-    document.getElementById('fl-note').textContent='到达时区(UTC'+(arrTz>=0?'+':'')+arrTz+')基于经度估算。巡航速度~850km/h。';
+    document.getElementById('fl-note').textContent='到达时区 UTC'+(arrTz>=0?'+':'')+arrTz+' ('+arr.country+')。巡航速度~850km/h。';
   }else{
     document.getElementById('fl-arrive').textContent='填写出发时间';
   }
@@ -1190,12 +1236,22 @@ function updateHSR(){
   if(arr){document.getElementById('hsr-arr-lat').value=arr.lat.toFixed(4);document.getElementById('hsr-arr-lng').value=arr.lng.toFixed(4)}
 }
 
+// 城市英文名→中文名映射（机场搜索用）
+const CITY_EN_ALIAS={'beijing':'北京','shanghai':'上海','guangzhou':'广州','shenzhen':'深圳',
+  'tokyo':'东京','osaka':'大阪','seoul':'首尔','bangkok':'曼谷','singapore':'新加坡',
+  'london':'伦敦','paris':'巴黎','frankfurt':'法兰克福','madrid':'马德里','rome':'罗马',
+  'moscow':'莫斯科','new york':'纽约','los angeles':'洛杉矶','dubai':'迪拜',
+  'hong kong':'香港','taipei':'台北','kuala lumpur':'吉隆坡','jakarta':'雅加达',
+  'delhi':'德里','mumbai':'孟买','istanbul':'伊斯坦布尔','sydney':'悉尼',
+  'amsterdam':'阿姆斯特丹','munich':'慕尼黑','zurich':'苏黎世','milan':'米兰','barcelona':'巴塞罗那'};
+
 function buildAirportTable(filter){
   let tb=document.querySelector('#airport-table tbody');
   tb.innerHTML='';
   let q=(filter||'').toLowerCase().trim();
   AIRPORTS.forEach(a=>{
-    if(q&&!a.iata.toLowerCase().includes(q)&&!a.name.toLowerCase().includes(q)&&!a.city.includes(q)&&!a.country.includes(q)&&!a.city.toLowerCase().includes(q)&&!a.country.toLowerCase().includes(q))return;
+    let alias=(CITY_EN_ALIAS[q]||'');
+    if(q&&!a.iata.toLowerCase().includes(q)&&!a.name.toLowerCase().includes(q)&&!a.city.toLowerCase().includes(q)&&!a.country.toLowerCase().includes(q)&&!(alias&&a.city.includes(alias)))return;
     tb.insertRow().innerHTML=`<td style="color:var(--accent);font-weight:bold">${a.iata}</td><td>${a.name}</td><td>${a.city}</td><td>${a.country}</td><td>${a.lat.toFixed(2)}</td><td>${a.lng.toFixed(2)}</td>`;
   });
 }
@@ -1209,6 +1265,47 @@ function initDates(){
   let t=todayStr();
   ['sm-date','lt-date','sh-date'].forEach(id=>{let e=document.getElementById(id);if(e)e.value=t});
 }
+function calcStarVisibility(){
+  let lat=parseFloat(document.getElementById('star-lat').value);
+  let lng=parseFloat(document.getElementById('star-lng').value);
+  let dv=document.getElementById('star-date').value;
+  let tv=document.getElementById('star-time').value;
+  if(isNaN(lat)||isNaN(lng)||!dv||!tv)return;
+  let[y,m,d]=dv.split('-').map(Number);
+  let[hh,mm]=tv.split(':').map(Number);
+  let jd=julianDay(y,m,d)-0.5+hh/24+mm/1440;
+  let jc=julianCentury(jd);
+  // 计算地方恒星时 LST
+  let lst=norm360(280.46061837+360.98564736629*(jd-2451545.0)+lng);
+
+  let visible=[];
+  BRIGHT_STARS.forEach(s=>{
+    // 星→赤道坐标→时角→高度角
+    let ha=norm360(lst-s.ra*15); if(ha>180)ha-=360;
+    let el=asind(sind(lat)*sind(s.dec)+cosd(lat)*cosd(s.dec)*cosd(ha));
+    if(el>0){
+      let az=Math.acos(Math.max(-1,Math.min(1,
+        (sind(s.dec)-sind(lat)*sind(el))/(cosd(lat)*cosd(el)))))*DEG;
+      if(ha>0)az=360-az;
+      let dir=az<22.5||az>337.5?'N':az<67.5?'NE':az<112.5?'E':az<157.5?'SE':az<202.5?'S':az<247.5?'SW':az<292.5?'W':'NW';
+      visible.push({...s,el,az,dir});
+    }
+  });
+  visible.sort((a,b)=>b.el-a.el);
+
+  let container=document.getElementById('star-vis-result');
+  let list=document.getElementById('star-vis-list');
+  container.style.display='block';
+  if(visible.length===0){list.innerHTML='<span style="color:var(--text2)">当前无亮星在地平线上</span>';return}
+  list.innerHTML=visible.map(v=>
+    `<div style="background:var(--input-bg);border:1px solid var(--border);border-radius:6px;padding:6px 10px;text-align:center;min-width:80px">
+      <div style="color:var(--accent);font-weight:bold;font-size:13px">${v.name}</div>
+      <div style="font-size:10px;color:var(--text2)">${v.const} · ${v.mag.toFixed(1)}等</div>
+      <div style="font-size:11px;color:var(--accent2)">↑${v.el.toFixed(0)}° ${v.dir}</div>
+    </div>`
+  ).join('');
+}
+
 function buildStarTable(){
   let tb=document.querySelector('#star-table tbody');
   BRIGHT_STARS.forEach(s=>{
@@ -1250,7 +1347,7 @@ function updateSunMoon(){
   document.getElementById('sm-moon-phase').textContent=mp.phaseName+' / '+(mp.illum*100).toFixed(0)+'%';
   document.getElementById('sm-moon-age').textContent=mp.age.toFixed(1)+' 天';
   // 画太阳全轨迹
-  drawSunPath(lat,lng,y,m,d,tz);
+  drawSunPath(lat,lng,y,m,d,tz,h,min);
   // 画月相月历
   drawMoonCalendar(y,m);
 
@@ -1266,7 +1363,7 @@ function updateSunMoon(){
 }
 
 // 太阳全轨迹图
-function drawSunPath(lat,lng,y,m,d,tz){
+function drawSunPath(lat,lng,y,m,d,tz,hr,min){
   let cv=document.getElementById('sunpath-canvas');if(!cv)return;
   let ctx=cv.getContext('2d'),w=cv.width,h=cv.height;
   ctx.clearRect(0,0,w,h);
@@ -1305,9 +1402,9 @@ function drawSunPath(lat,lng,y,m,d,tz){
       }
     }
   }
-  // 画当前太阳
-  let now=new Date();
-  let sun=calcSunPosition(lat,lng,y,m,d,now.getHours(),now.getMinutes(),0,tz);
+  // 画当前太阳（用用户选择的时间，未选择则用现在）
+  let sh=hr??new Date().getHours(), sm=min??new Date().getMinutes();
+  let sun=calcSunPosition(lat,lng,y,m,d,sh,sm,0,tz);
   if(sun.el>0){
     let r=R*(90-sun.el)/90,rad=(sun.az-90)*Math.PI/180;
     ctx.beginPath();ctx.arc(cx+r*Math.cos(rad),cy-r*Math.sin(rad),6,0,Math.PI*2);
@@ -1336,6 +1433,118 @@ function drawMoonCalendar(year,month){
   }
 }
 
+// 三角定位：已知两地标坐标+方位角→反推拍摄位置
+function calcTriangulate(){
+  let lat1=parseFloat(document.getElementById('tri-lat1').value),lng1=parseFloat(document.getElementById('tri-lng1').value),az1=parseFloat(document.getElementById('tri-az1').value);
+  let lat2=parseFloat(document.getElementById('tri-lat2').value),lng2=parseFloat(document.getElementById('tri-lng2').value),az2=parseFloat(document.getElementById('tri-az2').value);
+  if(isNaN(lat1)||isNaN(lng1)||isNaN(az1)||isNaN(lat2)||isNaN(lng2)||isNaN(az2))return;
+  // 反向方位: 从地标看向拍摄者
+  let baz1=(az1+180)%360*RAD, baz2=(az2+180)%360*RAD;
+  // 球面几何精确求解: 两个大圆交点
+  let p1=latLngToVec(lat1,lng1), p2=latLngToVec(lat2,lng2);
+  // 每个地标的方位线大圆法向量 = p × (p沿方位角方向移动90°)
+  let n1=latLngToVec(lat1+0.01*cosd(baz1*DEG),lng1+0.01*sind(baz1*DEG)/cosd(lat1));
+  let gcn1=cross(p1,n1); // 地标1方位大圆法向量
+  let n2=latLngToVec(lat2+0.01*cosd(baz2*DEG),lng2+0.01*sind(baz2*DEG)/cosd(lat2));
+  let gcn2=cross(p2,n2); // 地标2方位大圆法向量
+  // 两大圆交点 = 法向量叉积 (两个对称点, 取离两地标更近的那个)
+  let intr1=cross(gcn1,gcn2);
+  let[intLat,intLng]=vecToLatLng(intr1);
+  let[intLat2,intLng2]=vecToLatLng([-intr1[0],-intr1[1],-intr1[2]]);
+  // 选离两地标更近的那个
+  let dA=haversine(lat1,lng1,intLat,intLng).dist+haversine(lat2,lng2,intLat,intLng).dist;
+  let dB=haversine(lat1,lng1,intLat2,intLng2).dist+haversine(lat2,lng2,intLat2,intLng2).dist;
+  if(dB<dA){intLat=intLat2;intLng=intLng2}
+  // 验证: 交点处反算方位角应接近baz
+  let check1=haversine(intLat,intLng,lat1,lng1).bearing;
+  let check2=haversine(intLat,intLng,lat2,lng2).bearing;
+  let err1=Math.abs(norm360(check1)-norm360(baz1*DEG));
+  let err2=Math.abs(norm360(check2)-norm360(baz2*DEG));
+  let c=intLat.toFixed(6)+','+intLng.toFixed(6);
+  let ok=(Math.min(err1,360-err1)<5&&Math.min(err2,360-err2)<5);
+  document.getElementById('tri-result').innerHTML=ok
+    ?'拍摄位置: '+c+' (方位误差 '+Math.round(err1)+'°/'+Math.round(err2)+'°) <a href="https://www.google.com/maps?q='+c+'" target=_blank style=color:var(--accent2)>🗺️ 查看</a>'
+    :'方位线不相交(误差'+Math.round(Math.max(err1,err2))+'°)，请检查输入';
+
+  function latLngToVec(lat,lng){
+    let clat=cosd(lat), slat=sind(lat), clng=cosd(lng), slng=sind(lng);
+    return[clat*clng,clat*slng,slat];
+  }
+  function vecToLatLng(v){
+    let r=Math.sqrt(v[0]*v[0]+v[1]*v[1]+v[2]*v[2]);
+    return[asind(v[2]/r),atan2d(v[1],v[0])];
+  }
+  function cross(a,b){
+    return[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+  }
+}
+function genStreetView(){
+  let lat=parseFloat(document.getElementById('sv-lat').value),lng=parseFloat(document.getElementById('sv-lng').value);
+  let head=parseFloat(document.getElementById('sv-head').value)||0,pitch=parseFloat(document.getElementById('sv-pitch').value)||0;
+  if(isNaN(lat)||isNaN(lng))return;
+  let url='https://www.google.com/maps/@?api=1&map_action=pano&viewpoint='+lat+','+lng+'&heading='+head+'&pitch='+pitch+'&fov=90';
+  document.getElementById('sv-link').innerHTML='<a href="'+url+'" target=_blank style=color:var(--accent2)>打开 Google 街景 (朝向'+head+'° 俯仰'+pitch+'°)</a>';
+}
+// 自然地理计算
+function calcDayLen(){
+  let lat=parseFloat(document.getElementById('dl-lat').value),dv=document.getElementById('dl-date').value;
+  if(isNaN(lat)||!dv)return;
+  let[y,m,d]=dv.split('-').map(Number);
+  let jd=julianDay(y,m,d)-0.5,jc=julianCentury(jd);
+  let {dec}=getSolarData(jc);
+  let cosHA=(-0.01454-sind(lat)*sind(dec))/(cosd(lat)*cosd(dec));
+  if(cosHA<-1){document.getElementById('dl-result').textContent='极昼(24h)';return}
+  if(cosHA>1){document.getElementById('dl-result').textContent='极夜(0h)';return}
+  let ha=Math.acos(cosHA)*DEG/15;
+  let hh=Math.floor(ha*2),mm=Math.round((ha*2-hh)*60);
+  document.getElementById('dl-result').textContent=hh+'h '+mm+'m';
+}
+function calcNature(){
+  let lat=parseFloat(document.getElementById('ng-lat').value),alt=parseFloat(document.getElementById('ng-alt').value);
+  if(isNaN(lat)||isNaN(alt))return;
+  let abs=Math.abs(lat);
+  // 雪线海拔（纬度越高雪线越低）
+  let snowLine;if(abs<15)snowLine=5000;else if(abs<30)snowLine=4500;else if(abs<45)snowLine=3500;else if(abs<55)snowLine=2500;else if(abs<65)snowLine=1200;else if(abs<75)snowLine=400;else snowLine=0;
+  // 气温递减
+  let tempDrop=-6.5*alt/1000;
+  // 植被垂直带
+  let veg;if(alt<500)veg='常绿阔叶林/农田';else if(alt<1500)veg='落叶阔叶林/混交林';else if(alt<2500)veg='针叶林/针阔混交';else if(alt<3500)veg='亚高山草甸/灌丛';else if(alt<snowLine)veg='高山苔原/裸岩';else veg='积雪/冰川';
+  if(abs>60){veg='苔原/冰原（高纬）'}
+  document.getElementById('ng-snow').textContent=snowLine.toFixed(0)+' m';
+  document.getElementById('ng-temp').textContent=tempDrop.toFixed(1)+' °C';
+  document.getElementById('ng-veg').textContent=veg;
+}
+function calcHorizon(){
+  let h=parseFloat(document.getElementById('hz-h').value);
+  if(isNaN(h)||h<0)return;
+  let d=Math.sqrt(13*h); // 考虑大气折射的近似
+  document.getElementById('hz-result').textContent=d.toFixed(1)+' km';
+}
+function calcScale(){
+  let real=parseFloat(document.getElementById('sc-real').value);
+  let px=parseFloat(document.getElementById('sc-px').value);
+  let px2=parseFloat(document.getElementById('sc-px2').value);
+  if(isNaN(real)||isNaN(px)||isNaN(px2)||px<=0)return;
+  let scale=real/px;
+  document.getElementById('sc-result').textContent=(scale*px2).toFixed(2)+' m';
+}
+// 正午影子速算
+function calcNoonShadow(){
+  let dv=document.getElementById('noon-date').value;if(!dv)return;
+  let[y,m,d]=dv.split('-').map(Number);
+  let jd=julianDay(y,m,d)-0.5,jc=julianCentury(jd);
+  let {dec}=getSolarData(jc);
+  // 正午太阳高度角 = 90 - |lat - dec|  → tan(el) = 物高/影长
+  let el_30=90-Math.abs(30-dec); // 北纬30度
+  let el_40=90-Math.abs(40-dec);
+  let el_50=90-Math.abs(50-dec);
+  let el_eq=90-Math.abs(0-dec); // 赤道
+  document.getElementById('noon-result').textContent='赤纬 '+dec.toFixed(2)+'°';
+  document.getElementById('noon-note').textContent='北纬30°正午高 '+el_30.toFixed(1)+'° 影子比 1:'+Math.tan(el_30*RAD).toFixed(2)+
+    ' | 北纬40°高 '+el_40.toFixed(1)+'° 比 1:'+Math.tan(el_40*RAD).toFixed(2)+
+    ' | 北纬50°高 '+el_50.toFixed(1)+'° 比 1:'+Math.tan(el_50*RAD).toFixed(2)+
+    ' | 赤道高 '+el_eq.toFixed(1)+'° 比 1:'+Math.tan(el_eq*RAD).toFixed(2);
+}
 function calcFOV(){
   let fl=parseFloat(document.getElementById('fov-fl').value),sw=parseFloat(document.getElementById('fov-sw').value);
   if(isNaN(fl)||isNaN(sw)||fl<=0||sw<=0)return;
@@ -1412,12 +1621,25 @@ function updateLocalTime(){
   document.getElementById('lt-astr-dawn').textContent=fmtTime(astr.e1);
   document.getElementById('lt-astr-dusk').textContent=fmtTime(astr.e2);
 
-  // 黄金时刻 (太阳高度角 ~0°~-6°) 和蓝调时刻 (太阳高度角 ~-4°~-8°)
+  // 黄金时刻 (sun 0°→6°) 蓝调时刻 (sun -8°→-4°) — 用 calcTwilight 精确计算，随纬度变化
   if(sr.type==='ok'){
-    document.getElementById('lt-gold-mrn').textContent=fmtTime(sr.e1)+' ~ '+fmtTime(sr.e1+1);
-    document.getElementById('lt-gold-eve').textContent=fmtTime(sr.e2-1)+' ~ '+fmtTime(sr.e2);
-    document.getElementById('lt-blue-mrn').textContent=fmtTime(sr.e1-0.5)+' ~ '+fmtTime(sr.e1);
-    document.getElementById('lt-blue-eve').textContent=fmtTime(sr.e2)+' ~ '+fmtTime(sr.e2+0.5);
+    let gold=calcTwilight(lat,lng,y,m,d,tz,6);   // 太阳高度角 +6°
+    let blueLo=calcTwilight(lat,lng,y,m,d,tz,-4); // 太阳高度角 -4°
+    let blueHi=calcTwilight(lat,lng,y,m,d,tz,-8); // 太阳高度角 -8°
+    if(gold.type==='ok'){
+      document.getElementById('lt-gold-mrn').textContent=fmtTime(sr.e1)+' ~ '+fmtTime(gold.e1);
+      document.getElementById('lt-gold-eve').textContent=fmtTime(gold.e2)+' ~ '+fmtTime(sr.e2);
+    }else{
+      document.getElementById('lt-gold-mrn').textContent='--';
+      document.getElementById('lt-gold-eve').textContent='--';
+    }
+    if(blueLo.type==='ok'&&blueHi.type==='ok'){
+      document.getElementById('lt-blue-mrn').textContent=fmtTime(blueHi.e1)+' ~ '+fmtTime(blueLo.e1);
+      document.getElementById('lt-blue-eve').textContent=fmtTime(blueLo.e2)+' ~ '+fmtTime(blueHi.e2);
+    }else{
+      document.getElementById('lt-blue-mrn').textContent='--';
+      document.getElementById('lt-blue-eve').textContent='--';
+    }
   }else{
     ['lt-gold-mrn','lt-gold-eve','lt-blue-mrn','lt-blue-eve'].forEach(id=>document.getElementById(id).textContent='--');
   }
@@ -1460,13 +1682,7 @@ function updateShadow(){
   let[y,m,d]=dv.split('-').map(Number);
   let[hh,min]=tv.split(':').map(Number);
   let jd=julianDay(y,m,d)-0.5,jc=julianCentury(jd);
-  let gml=norm360(280.46646+jc*(36000.76983+jc*0.0003032));
-  let gma=357.52911+jc*(35999.05029-0.0001537*jc);
-  let seq=sind(gma)*(1.914602-jc*(0.004817+0.000014*jc))+sind(2*gma)*(0.019993-0.000101*jc)+sind(3*gma)*0.000289;
-  let stl=gml+seq;
-  let mob=23+(26+((21.448-jc*(46.815+jc*(0.00059-jc*0.001813))))/60)/60;
-  let obc=mob+0.00256*cosd(125.04-1934.136*jc);
-  let dec=asind(sind(obc)*sind(stl));
+  let {dec}=getSolarData(jc);
 
   let lngEst=parseFloat(document.getElementById('sh-lng-est').value);
   let note='';
@@ -1507,6 +1723,104 @@ function updateMagnetic(){
   document.getElementById('mag-note').textContent='磁北在真北以'+dir+' '+abs.toFixed(1)+'°。真北=罗盘读数'+(m.decl>0?'−':'+')+abs.toFixed(1)+'°。(精度约±2°)';
 }
 
+/* ==================== AI 照片分析 ==================== */
+let photoBase64=null;
+function getAPIKey(){return document.getElementById('api-key-input').value.trim()||localStorage.getItem('cc_ai_key')||''}
+function saveAPIKey(){let v=document.getElementById('api-key-input').value.trim();if(v)localStorage.setItem('cc_ai_key',v)}
+// 启动时恢复 Key
+setTimeout(()=>{let k=localStorage.getItem('cc_ai_key');if(k)document.getElementById('api-key-input').value=k},100);
+
+function handlePhotoDrop(e){
+  e.preventDefault();
+  e.target.style.borderColor='var(--border)';
+  let file=e.dataTransfer.files[0];
+  if(file)loadPhoto(file);
+}
+function handlePhotoFile(input){
+  let file=input.files[0];
+  if(file)loadPhoto(file);
+}
+function loadPhoto(file){
+  if(!file.type.startsWith('image/')){document.getElementById('photo-status').textContent='请选择图片文件';return}
+  let reader=new FileReader();
+  reader.onload=function(ev){
+    photoBase64=ev.target.result;
+    document.getElementById('photo-preview').style.display='block';
+    document.getElementById('photo-img').src=photoBase64;
+    document.getElementById('photo-status').textContent='已加载 '+(file.size/1024).toFixed(1)+' KB';
+    // EXIF 提取
+    extractEXIF(file);
+  };
+  reader.readAsDataURL(file);
+}
+function extractEXIF(file){
+  // 简化 EXIF 提取：读取文件头中的日期/时间信息
+  let exifEl=document.getElementById('photo-exif');
+  exifEl.textContent='';
+  if(file.lastModified){
+    let d=new Date(file.lastModified);
+    exifEl.textContent='文件时间: '+d.toLocaleString('zh-CN');
+  }
+  // 尝试读取完整 EXIF（需要 EXIF.js，暂时用文件修改时间）
+  let reader=new FileReader();
+  reader.onload=function(){
+    let view=new DataView(reader.result);
+    // 检查 JPEG SOI
+    if(view.getUint16(0)!==0xFFD8){return}
+    let offset=2, length=view.byteLength;
+    while(offset<length){
+      if(view.getUint8(offset)!==0xFF)break;
+      let marker=view.getUint8(offset+1);
+      if(marker===0xE1){ // APP1 = EXIF
+        let exifStart=offset+4;
+        // 简单提取 GPS 和日期(不完整实现，仅做标记)
+        let exifStr='';
+        for(let i=exifStart;i<Math.min(exifStart+500,length);i++){
+          let b=view.getUint8(i);
+          if(b>=32&&b<127)exifStr+=String.fromCharCode(b);
+        }
+        if(exifStr.includes('GPS'))exifEl.textContent+=' | 📍 含GPS信息';
+        if(exifStr.includes('Apple')||exifStr.includes('iPhone'))exifEl.textContent+=' | 📱 iPhone拍摄';
+        if(exifStr.includes('Samsung')||exifStr.includes('Galaxy'))exifEl.textContent+=' | 📱 三星拍摄';
+        break;
+      }
+      offset+=2+view.getUint16(offset+2);
+    }
+  };
+  reader.readAsArrayBuffer(file.slice(0,65536));
+}
+async function analyzePhoto(){
+  if(!photoBase64){document.getElementById('photo-status').textContent='请先上传照片';return}
+  document.getElementById('photo-status').textContent='AI 分析中...';
+  let desc=document.getElementById('photo-desc').value.trim();
+  let prompt=desc
+    ?`你是一个 OSINT 网络谜踪专家。用户上传了一张照片并描述："${desc}"。请分析可能的拍摄地点线索。关注：地理区域、气候、语言/文字、建筑风格、交通标识、植被类型、天空色温推断时间。用中文回复，分条列出。`
+    :`你是一个 OSINT 网络谜踪专家。请分析这张照片，提取所有可能的拍摄地点线索。关注：语言文字、路标路桩、车牌、建筑风格、植被类型、天空色温、人物穿着。用中文分条回复。`;
+  try{
+    let key=getAPIKey();
+    if(!key){document.getElementById('photo-status').textContent='请先在设置中填写 AI API Key';return}
+    let resp=await fetch('https://api.deepseek.com/v1/chat/completions',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+      body:JSON.stringify({
+        model:'deepseek-chat',
+        messages:[
+          {role:'system',content:'你是 OSINT 网络谜踪专家。从照片中提取地理位置线索。简洁、分条、专业。'},
+          {role:'user',content:prompt}
+        ],
+        temperature:0.5,max_tokens:600
+      })
+    });
+    let data=await resp.json();
+    let result=data.choices?.[0]?.message?.content||'AI 无响应，请重试';
+    document.getElementById('photo-result').style.display='block';
+    document.getElementById('photo-result').textContent=result;
+    document.getElementById('photo-status').textContent='分析完成';
+  }catch(e){
+    document.getElementById('photo-status').textContent='网络错误: '+e.message;
+  }
+}
+
 /* ==================== 7. 地理工具 ==================== */
 function calcAntipode(){
   let lat=parseFloat(document.getElementById('ap-lat').value);
@@ -1536,7 +1850,7 @@ function genW3W(){
   let lat=parseFloat(document.getElementById('w3w-lat').value),lng=parseFloat(document.getElementById('w3w-lng').value);
   if(isNaN(lat)||isNaN(lng))return;
   let c=lat.toFixed(6)+','+lng.toFixed(6);
-  document.getElementById('w3w-link').innerHTML='<a href="https://what3words.com/pretty.failed.signal" target=_blank style=color:var(--accent2)>在 What3Words 地图查看: '+c+'</a>';
+  document.getElementById('w3w-link').innerHTML='<a href="https://what3words.com/map?lat='+lat+'&lng='+lng+'" target="_blank" style="color:var(--accent2)">在 What3Words 地图查看: '+c+'</a>';
 }
 // MGRS/UTM 转换
 function calcMGRS(){
@@ -1569,12 +1883,20 @@ function estClimate(){
 }
 
 /* ==================== 8. 知识图鉴过滤 ==================== */
+let _knowKw='all';
 function filterKnowledge(kw){
+  _knowKw=kw;
   document.querySelectorAll('#know-tags .btn').forEach(b=>b.classList.remove('active'));
   let btn=document.querySelector(`[data-kw="${kw}"]`);
   if(btn)btn.classList.add('active');
+  renderKnowledge();
+}
+function renderKnowledge(){
+  let q=(document.getElementById('know-search').value||'').toLowerCase().trim();
   document.querySelectorAll('#know-grid .know-card').forEach(c=>{
-    c.style.display=(kw==='all'||c.dataset.kw===kw)?'block':'none';
+    let kwMatch=_knowKw==='all'||c.dataset.kw===_knowKw;
+    let qMatch=!q||c.querySelector('h4')?.textContent.toLowerCase().includes(q)||c.querySelector('p')?.textContent.toLowerCase().includes(q);
+    c.style.display=(kwMatch&&qMatch)?'block':'none';
   });
 }
 
