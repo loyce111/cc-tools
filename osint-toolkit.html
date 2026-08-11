@@ -12,6 +12,8 @@
 <meta name="apple-mobile-web-app-title" content="OSINT工具">
 <link rel="icon" type="image/svg+xml" href="/osint-icon.svg">
 <link rel="apple-touch-icon" href="/osint-icon.svg">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://cdn.jsdelivr.net/npm/exif-js@2.3.0/exif.min.js"></script>
 <!--
   MIT License — 开源免费使用
   网络谜踪 (Internet Sleuthing / OSINT Photo Geolocation) 全能工具合集
@@ -177,6 +179,20 @@ h4.sub-title{color:var(--accent2);margin-bottom:8px;font-size:14px}
     <h4 style="color:var(--accent2);margin-top:10px">☀️ 太阳全天轨迹</h4>
     <canvas id="sunpath-canvas" width="400" height="160" style="width:100%;max-width:400px;border-radius:6px;background:#0a0a20;display:block;margin:6px auto"></canvas>
     <div style="text-align:center;font-size:10px;color:var(--text2)">弧线=太阳路径 · 黄点=当前太阳位置 · 红色=日出/日落</div>
+
+    <!-- 太阳热力图 -->
+    <h4 style="color:var(--accent);margin-top:12px">🌡️ 太阳位置世界热力图</h4>
+    <div class="row">
+      <div class="field"><label>观测太阳高度°</label><input id="hl-el" class="w80" placeholder="如 30"></div>
+      <div class="field"><label>观测太阳方位°</label><input id="hl-az" class="w80" placeholder="如 225"></div>
+      <div class="field"><label>日期</label><input id="hl-date" type="date"></div>
+      <div class="field"><label>UTC时间</label><input id="hl-time" type="time" value="12:00"></div>
+      <div class="field"><label>容差°</label><input id="hl-tol" class="w80" value="3"></div>
+      <button class="btn btn-go btn-sm" onclick="genHeatmap()">🌡️ 生成热力图</button>
+    </div>
+    <canvas id="heatmap-canvas" width="720" height="360" style="width:100%;max-width:720px;border-radius:6px;background:#0a0a20;display:block;margin:6px auto"></canvas>
+    <div style="text-align:center;font-size:10px;color:var(--text2)">绿/黄色区域=太阳在该位置、该高度角、该方位角的所有可能地点 | 标注=高度角误差</div>
+    <div class="note">💡 照片中已知太阳高度角和方位角→在地球上画出"可能线"。结合其他线索(植被/路桩/文字)交叉定位。</div>
     <!-- 月相月历 -->
     <h4 style="color:var(--accent2);margin-top:8px">🌙 本月月相日历</h4>
     <div id="moon-calendar" style="display:flex;flex-wrap:wrap;gap:3px;justify-content:center;margin-top:4px"></div>
@@ -216,6 +232,16 @@ h4.sub-title{color:var(--accent2);margin-bottom:8px;font-size:14px}
       <div class="result-item"><div class="val sm" id="lt-blue-eve">--</div><div class="lbl">蓝调时刻(暮)</div></div>
     </div>
     <div class="note">💡 照片色温偏暖=黄金时刻（日落前~1h）；偏冷=蓝调时刻（日落后~20min）。影子最短=正午（太阳在正南/正北）。</div>
+  </div>
+
+  <!-- 历史天气反查 -->
+  <div class="result-box" style="margin-top:12px">
+    <h3 style="color:var(--accent)">🌦️ 历史天气反查</h3>
+    <div class="row">
+      <button class="btn btn-go btn-sm" onclick="lookupWeather()">🌤 查询当天天气</button>
+      <span id="weather-info" style="font-size:12px;color:var(--accent2);line-height:28px"></span>
+    </div>
+    <div class="note">💡 使用 Open-Meteo 免费历史天气API。验证照片中的光线/影子/云量与天气是否一致。注：仅支持近90天数据。</div>
   </div>
 </div>
 
@@ -387,6 +413,27 @@ h4.sub-title{color:var(--accent2);margin-bottom:8px;font-size:14px}
       </div>
     </div>
     <div id="photo-result" style="display:none;margin-top:10px;padding:10px;background:rgba(79,195,247,0.04);border-radius:6px;border-left:3px solid var(--accent2);font-size:12px;color:var(--text);line-height:1.7;white-space:pre-wrap"></div>
+    <!-- EXIF 时间验证 -->
+    <div style="margin-top:6px">
+      <button class="btn btn-go btn-sm" onclick="verifyPhotoTime()" style="font-size:10px">🕵️ 验证照片时间真伪</button>
+      <span id="time-verify-result" style="font-size:11px;color:var(--accent2);margin-left:8px"></span>
+    </div>
+  </div>
+
+  <!-- 嵌入式地图 -->
+  <div class="result-box" style="margin-bottom:14px">
+    <h3 style="color:var(--accent)">🗺️ 交互地图 <span style="font-size:11px;color:var(--text2);font-weight:normal">— 点击放标记 · 右键测距</span></h3>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <div class="field"><label>纬度</label><input id="map-inp-lat" class="w100" placeholder="39.9042"></div>
+      <div class="field"><label>经度</label><input id="map-inp-lng" class="w100" placeholder="116.4074"></div>
+      <div class="field"><label>缩放</label><input id="map-zoom" value="13" class="w80" style="width:50px"></div>
+      <button class="btn btn-go btn-sm" onclick="jumpMap()">📍 跳转</button>
+      <button class="btn btn-go btn-sm" onclick="clearMapMarkers()">🗑️ 清除</button>
+      <button class="btn btn-go btn-sm" onclick="fitAllMarkers()">🔲 全览</button>
+    </div>
+    <div id="osm-map" style="width:100%;height:320px;border-radius:8px;border:1px solid var(--border)"></div>
+    <div id="map-coords-display" style="font-size:11px;color:var(--accent2);margin-top:4px;font-family:var(--font-mono)"></div>
+    <div class="note">💡 点击地图任意位置→获取坐标+添加标记 · 地图数据 © OpenStreetMap</div>
   </div>
 
   <div style="display:flex;flex-wrap:wrap;gap:16px;">
@@ -511,6 +558,66 @@ h4.sub-title{color:var(--accent2);margin-bottom:8px;font-size:14px}
       <div class="note">基于纬度粗略判断。实际气候受海拔、洋流等影响。</div>
     </div>
   </div>
+
+  <!-- 山峰识别 -->
+  <div class="result-box" style="margin-top:12px">
+    <h3 style="color:var(--accent)">🏔️ 视线山峰识别 <span style="font-size:11px;color:var(--text2);font-weight:normal">— 远处的山是哪座？</span></h3>
+    <div class="row">
+      <div class="field"><label>我的纬度</label><input id="peak-lat" class="w80" value="39.9"></div>
+      <div class="field"><label>经度</label><input id="peak-lng" class="w80" value="116.4"></div>
+      <div class="field"><label>看向方向°</label><input id="peak-dir" class="w80" placeholder="如 315(西北)"></div>
+      <div class="field"><label>搜索半径km</label><input id="peak-r" class="w80" value="100"></div>
+      <button class="btn btn-go btn-sm" onclick="findPeaks()">🔭 找山</button>
+    </div>
+    <div id="peak-result" style="margin-top:8px;font-size:12px;color:var(--text);max-height:200px;overflow-y:auto"></div>
+    <div class="note">💡 使用 OpenStreetMap Overpass API，查询指定方向范围内的山峰。方向误差±15°。</div>
+  </div>
+
+  <!-- OSINT 搜索语句生成器 -->
+  <div class="result-box" style="margin-top:12px">
+    <h3 style="color:var(--accent)">🔎 OSINT 搜索语句生成器 <span style="font-size:11px;color:var(--text2);font-weight:normal">— 输入线索词，生成多平台搜索链接</span></h3>
+    <div class="row">
+      <div class="field" style="flex:1"><input id="search-clues" placeholder="线索词，空格分隔。例：红白路桩 雪山 棕榈树 黄车牌" style="width:100%;min-width:300px" onkeydown="if(event.key==='Enter')genSearchQueries()"></div>
+      <button class="btn btn-go btn-sm" onclick="genSearchQueries()">🔍 生成</button>
+    </div>
+    <div id="search-links" style="display:none;margin-top:8px;font-size:12px;line-height:2"></div>
+  </div>
+
+  <!-- 基站/WiFi 参考 -->
+  <div class="result-box" style="margin-top:12px">
+    <h3 style="color:var(--accent)">📡 基站/WiFi 定位参考</h3>
+    <div class="row">
+      <div class="field"><input id="cell-input" placeholder="搜基站号/WiFi名/运营商..." style="width:260px" oninput="searchCellRef()"></div>
+      <div class="field"><select id="cell-filter" onchange="searchCellRef()"><option value="all">全部</option><option value="cn">🇨🇳 中国</option><option value="jp">🇯🇵 日本</option><option value="kr">🇰🇷 韩国</option><option value="eu">🇪🇺 欧洲</option><option value="us">🇺🇸 美国</option></select></div>
+    </div>
+    <div class="scroll-tbl" style="max-height:220px"><table class="data-table" id="cell-table"><thead><tr><th>国家</th><th>运营商</th><th>MCC-MNC</th><th>WiFi/SSID特征</th></tr></thead><tbody></tbody></table></div>
+    <div class="note">💡 照片拍到基站天线/设备编号→查运营商→缩小区域。WiFi SSID前缀(CMCC/ChinaNet等)同理。</div>
+  </div>
+
+  <!-- 连锁品牌分布 -->
+  <div class="result-box" style="margin-top:12px">
+    <h3 style="color:var(--accent)">🏪 连锁品牌地理分布</h3>
+    <div class="row">
+      <div class="field"><input id="brand-input" placeholder="搜品牌: 7-Eleven / 美宜佳 / Lawson / 蜂巢..." style="width:260px" oninput="searchBrand()"></div>
+      <div class="field"><select id="brand-region" onchange="searchBrand()"><option value="all">🌍 全球</option><option value="asia">🌏 亚洲</option><option value="cn">🇨🇳 中国特有</option><option value="jp">🇯🇵 日本</option><option value="eu">🇪🇺 欧洲</option><option value="us">🇺🇸 北美</option></select></div>
+    </div>
+    <div id="brand-result" style="font-size:12px;line-height:1.8;color:var(--text);margin-top:4px"></div>
+    <div class="note">💡 照片拍到连锁店→对照品牌分布→直接缩小到几个国家甚至城市。便利店/快餐/快递柜最有价值。</div>
+  </div>
+
+  <!-- URL 反查 -->
+  <div class="result-box" style="margin-top:12px">
+    <h3 style="color:var(--accent)">🔗 URL/短链接反查</h3>
+    <div class="row">
+      <div class="field" style="flex:1"><input id="url-input" placeholder="粘贴短链接或网址，如 bit.ly/xxx 或 example.com" style="width:100%;min-width:280px" onkeydown="if(event.key==='Enter')expandURL()"></div>
+      <button class="btn btn-go btn-sm" onclick="expandURL()">🔍 展开</button>
+      <button class="btn btn-go btn-sm" onclick="whoisURL()">🌐 Whois</button>
+    </div>
+    <div id="url-result" style="font-size:12px;line-height:1.7;color:var(--accent2);margin-top:6px;word-break:break-all"></div>
+    <div class="note">💡 照片中有网址/二维码链接→展开短链看真实地址→查域名whois→定位服务器/注册人。</div>
+  </div>
+
+</div>
 </div>
 
 <!-- ==================== 8. 知识图鉴 ==================== -->
@@ -535,34 +642,27 @@ h4.sub-title{color:var(--accent2);margin-bottom:8px;font-size:14px}
     <button class="btn btn-go btn-sm" data-kw="util">⚡ 电线杆</button>
   </div>
   <div class="know-grid" id="know-grid"></div>
+
+  <!-- 车牌决策树 -->
+  <div class="result-box" style="margin-top:16px;border:2px solid rgba(240,184,48,0.25)">
+    <h3 style="color:var(--accent)">🎯 车牌识别决策树 <span style="font-size:11px;color:var(--text2);font-weight:normal">— 回答几个问题，AI 帮你锁定</span></h3>
+    <div id="plate-q" style="font-size:15px;color:var(--accent2);margin-bottom:8px;font-weight:bold"></div>
+    <div id="plate-opts" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"></div>
+    <div id="plate-result" style="font-size:18px;color:var(--accent);font-weight:bold"></div>
+    <button class="btn btn-go btn-sm" id="plate-reset" style="display:none" onclick="initPlateTree()">🔄 重新来</button>
+  </div>
 </div>
 
 <!-- ==================== 9. 线索清单 ==================== -->
 <div class="tab-panel" id="panel-checklist">
   <h3 class="panel-title">📋 网络谜踪 系统化分析流程</h3>
-  <p style="font-size:12px;color:var(--text2);margin-bottom:12px">拿到一张需要定位的照片后，按以下顺序逐项排查：</p>
-  <ol class="checklist">
-    <li><span class="step-num">1.</span> <strong>拍照时间</strong> — EXIF / 截图时间 / 社交媒体时间戳 → 确定日期和大致时间（注意时区）</li>
-    <li><span class="step-num">2.</span> <strong>太阳/影子</strong> — 影子长度→太阳高度角；影子方向→太阳方位角 → 使用「阴影反推」工具估算纬度</li>
-    <li><span class="step-num">3.</span> <strong>月亮</strong> — 照片中有月亮→月相+照度约束日期；月亮高度+方向辅助定位</li>
-    <li><span class="step-num">4.</span> <strong>文字系统</strong> — 招牌/广告/路标上的文字 → 确定语言/国家/地区</li>
-    <li><span class="step-num">5.</span> <strong>车牌格式</strong> — 颜色+排列 → 确定国家（有时精确到省/州）</li>
-    <li><span class="step-num">6.</span> <strong>道路行驶方向</strong> — 靠左/靠右 → 排除一半国家</li>
-    <li><span class="step-num">7.</span> <strong>路标样式</strong> — 颜色+形状+字体 → 国家识别（高速路牌颜色特别有用）</li>
-    <li><span class="step-num">8.</span> <strong>路桩/护栏</strong> — 不同国家的路桩（Bollard）设计差异极大</li>
-    <li><span class="step-num">9.</span> <strong>建筑风格</strong> — 屋顶/窗户/阳台/材料 → 区域识别</li>
-    <li><span class="step-num">10.</span> <strong>植被类型</strong> — 热带/温带/地中海/针叶林 → 气候带→纬度范围</li>
-    <li><span class="step-num">11.</span> <strong>电线杆/路灯</strong> — 样式差异 → 国家/地区识别</li>
-    <li><span class="step-num">12.</span> <strong>邮筒/消防栓</strong> — 颜色+形状 → 国家特定</li>
-    <li><span class="step-num">13.</span> <strong>出租车颜色</strong> — 许多城市有统一的出租车涂装</li>
-    <li><span class="step-num">14.</span> <strong>货币/价格标签</strong> — ¥/$/€/£ 符号 + 价格水平 → 区域判断</li>
-    <li><span class="step-num">15.</span> <strong>电源插座</strong> — 室内照片中的插座样式 → 国家集团识别</li>
-    <li><span class="step-num">16.</span> <strong>星空</strong> — 北极星高度=纬度；星座可见性→季节+半球</li>
-    <li><span class="step-num">17.</span> <strong>旗帜</strong> — 国旗/省旗/市旗 → 直接定位</li>
-    <li><span class="step-num">18.</span> <strong>数字格式</strong> — 阿拉伯数字 vs 东方阿拉伯数字 vs 中文数字 → 文化区域</li>
-    <li><span class="step-num">19.</span> <strong>电话区号</strong> — 广告上的电话号码 → 国家代码</li>
-    <li><span class="step-num">20.</span> <strong>交叉验证</strong> — 把以上所有线索综合，在 Google Maps/Street View 中验证</li>
-  </ol>
+  <p style="font-size:12px;color:var(--text2);margin-bottom:8px">拿到一张需要定位的照片后，逐项排查打勾：</p>
+  <div style="margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap">
+    <button class="btn btn-go btn-sm" onclick="checklistCheckAll()">☑️ 全选</button>
+    <button class="btn btn-go btn-sm" onclick="checklistClearAll()">⬜ 清空</button>
+    <span id="checklist-progress" style="font-size:12px;color:var(--accent2);line-height:28px;margin-left:8px"></span>
+  </div>
+  <div id="checklist-items"></div>
 </div>
 
 <!-- ==================== 10. 坐标系统 ==================== -->
@@ -1754,40 +1854,43 @@ function loadPhoto(file){
   reader.readAsDataURL(file);
 }
 function extractEXIF(file){
-  // 简化 EXIF 提取：读取文件头中的日期/时间信息
-  let exifEl=document.getElementById('photo-exif');
-  exifEl.textContent='';
-  if(file.lastModified){
-    let d=new Date(file.lastModified);
-    exifEl.textContent='文件时间: '+d.toLocaleString('zh-CN');
+  let el=document.getElementById('photo-exif');
+  el.textContent='提取中...';
+  // 使用 exif-js 完整解析
+  if(typeof EXIF!=='undefined'){
+    EXIF.getData(file,function(){
+      let parts=[];
+      let make=EXIF.getTag(this,'Make');
+      let model=EXIF.getTag(this,'Model');
+      if(make||model)parts.push('📷 '+(make||'')+' '+(model||''));
+      let dt=EXIF.getTag(this,'DateTimeOriginal')||EXIF.getTag(this,'DateTime');
+      if(dt)parts.push('🕐 '+dt);
+      let lat=EXIF.getTag(this,'GPSLatitude'),lng=EXIF.getTag(this,'GPSLongitude');
+      let latRef=EXIF.getTag(this,'GPSLatitudeRef'),lngRef=EXIF.getTag(this,'GPSLongitudeRef');
+      if(lat&&lng){
+        let dlat=lat[0]+lat[1]/60+lat[2]/3600;if(latRef==='S')dlat=-dlat;
+        let dlng=lng[0]+lng[1]/60+lng[2]/3600;if(lngRef==='W')dlng=-dlng;
+        parts.push('📍 '+dlat.toFixed(6)+','+dlng.toFixed(6));
+        window._exifGPS={lat:dlat,lng:dlng}; // 存下来给时间验证用
+      }else{window._exifGPS=null}
+      let fl=EXIF.getTag(this,'FocalLength');
+      if(fl)parts.push('🔭 焦距 '+fl+'mm');
+      let fnum=EXIF.getTag(this,'FNumber');
+      if(fnum)parts.push('🔆 f/'+fnum);
+      let iso=EXIF.getTag(this,'ISOSpeedRatings');
+      if(iso)parts.push('🎨 ISO '+iso);
+      let exp=EXIF.getTag(this,'ExposureTime');
+      if(exp)parts.push('⏱️ 快门 '+exp+'s');
+      let sw=EXIF.getTag(this,'Software');
+      if(sw)parts.push('💾 '+sw);
+      window._exifTime=dt||null;
+      el.textContent=parts.join(' | ')||'无可读EXIF数据';
+      el.style.color=sw?'var(--accent)':'var(--accent2)'; // 被软件处理过=橙色提醒
+      if(sw)el.textContent+=' ⚠️ 图片曾被软件处理';
+    });
+  }else{
+    el.textContent='EXIF库未加载，请刷新重试';
   }
-  // 尝试读取完整 EXIF（需要 EXIF.js，暂时用文件修改时间）
-  let reader=new FileReader();
-  reader.onload=function(){
-    let view=new DataView(reader.result);
-    // 检查 JPEG SOI
-    if(view.getUint16(0)!==0xFFD8){return}
-    let offset=2, length=view.byteLength;
-    while(offset<length){
-      if(view.getUint8(offset)!==0xFF)break;
-      let marker=view.getUint8(offset+1);
-      if(marker===0xE1){ // APP1 = EXIF
-        let exifStart=offset+4;
-        // 简单提取 GPS 和日期(不完整实现，仅做标记)
-        let exifStr='';
-        for(let i=exifStart;i<Math.min(exifStart+500,length);i++){
-          let b=view.getUint8(i);
-          if(b>=32&&b<127)exifStr+=String.fromCharCode(b);
-        }
-        if(exifStr.includes('GPS'))exifEl.textContent+=' | 📍 含GPS信息';
-        if(exifStr.includes('Apple')||exifStr.includes('iPhone'))exifEl.textContent+=' | 📱 iPhone拍摄';
-        if(exifStr.includes('Samsung')||exifStr.includes('Galaxy'))exifEl.textContent+=' | 📱 三星拍摄';
-        break;
-      }
-      offset+=2+view.getUint16(offset+2);
-    }
-  };
-  reader.readAsArrayBuffer(file.slice(0,65536));
 }
 async function analyzePhoto(){
   if(!photoBase64){document.getElementById('photo-status').textContent='请先上传照片';return}
@@ -1940,6 +2043,402 @@ document.getElementById('know-tags').addEventListener('click',e=>{
   });
 });
 
+/* ==================== 基站 WiFi 参考 ==================== */
+const CELL_DATA=[
+  // 中国
+  {cc:'🇨🇳 中国',op:'中国移动',mcc:'460-00/02/07',wifi:'CMCC / CMCC-EDU / CMCC-WEB',reg:'cn'},
+  {cc:'🇨🇳 中国',op:'中国联通',mcc:'460-01/06',wifi:'ChinaUnicom / CU_',reg:'cn'},
+  {cc:'🇨🇳 中国',op:'中国电信',mcc:'460-03/05/11',wifi:'ChinaNet / ChinaNet-',reg:'cn'},
+  // 日本
+  {cc:'🇯🇵 日本',op:'NTT docomo',mcc:'440-10',wifi:'docomo / 0000docomo',reg:'jp'},
+  {cc:'🇯🇵 日本',op:'SoftBank',mcc:'440-20',wifi:'SoftBank / FON_FREE',reg:'jp'},
+  {cc:'🇯🇵 日本',op:'KDDI (au)',mcc:'440-50',wifi:'au_Wi-Fi / KDDI',reg:'jp'},
+  // 韩国
+  {cc:'🇰🇷 韩国',op:'SK Telecom',mcc:'450-05',wifi:'T wifi zone / SKT',reg:'kr'},
+  {cc:'🇰🇷 韩国',op:'KT',mcc:'450-08',wifi:'KT_WiFi / OllehWiFi',reg:'kr'},
+  {cc:'🇰🇷 韩国',op:'LG U+',mcc:'450-06',wifi:'U+zone',reg:'kr'},
+  // 美国
+  {cc:'🇺🇸 美国',op:'AT&T',mcc:'310-410',wifi:'attwifi / ATT',reg:'us'},
+  {cc:'🇺🇸 美国',op:'Verizon',mcc:'310-012',wifi:'Verizon- / FiOS-',reg:'us'},
+  {cc:'🇺🇸 美国',op:'T-Mobile US',mcc:'310-260',wifi:'T-Mobile / TMobile',reg:'us'},
+  // 欧洲
+  {cc:'🇪🇺 欧洲',op:'Vodafone',mcc:'多国(234-15英/262-02德/222-10意)',wifi:'Vodafone / VF-',reg:'eu'},
+  {cc:'🇪🇺 欧洲',op:'Orange',mcc:'208-01(法)/206-10(比)',wifi:'Orange / Livebox-',reg:'eu'},
+  {cc:'🇪🇺 欧洲',op:'Deutsche Telekom',mcc:'262-01',wifi:'Telekom / T-Online',reg:'eu'},
+  {cc:'🇪🇺 欧洲',op:'Telefonica/O2',mcc:'214-07(西)/234-10(英)',wifi:'O2-WiFi / Movistar',reg:'eu'},
+  // 其他
+  {cc:'🇷🇺 俄罗斯',op:'MTS',mcc:'250-01',wifi:'MTS / MTSconnect',reg:'other'},
+  {cc:'🇮🇳 印度',op:'Airtel',mcc:'404-02',wifi:'Airtel-',reg:'other'},
+  {cc:'🇦🇺 澳大利亚',op:'Telstra',mcc:'505-01',wifi:'Telstra / Telstra Air',reg:'other'},
+  {cc:'🇧🇷 巴西',op:'Vivo',mcc:'724-06',wifi:'Vivo Wi-Fi',reg:'other'},
+];
+function searchCellRef(){
+  let q=(document.getElementById('cell-input').value||'').toLowerCase();
+  let f=document.getElementById('cell-filter').value;
+  let rows=CELL_DATA.filter(d=>{
+    if(f!=='all'&&d.reg!==f)return false;
+    if(!q)return true;
+    return d.cc.includes(q)||d.op.toLowerCase().includes(q)||d.mcc.includes(q)||d.wifi.toLowerCase().includes(q);
+  });
+  document.querySelector('#cell-table tbody').innerHTML=rows.map(r=>
+    `<tr><td>${r.cc}</td><td style="color:var(--accent)">${r.op}</td><td>${r.mcc}</td><td style="font-size:11px">${r.wifi}</td></tr>`
+  ).join('')||'<tr><td colspan="4">无匹配</td></tr>';
+}
+
+/* ==================== 连锁品牌分布 ==================== */
+const BRAND_DATA=[
+  // 便利店
+  {name:'7-Eleven',region:'全球26国',detail:'日本/台湾/泰国/香港/菲律宾/丹麦/瑞典/挪威/墨西哥/韩国/美国/加拿大',tags:'asia,us,eu',note:'日本最多(~21000家)，泰国次之(~13000家)'},
+  {name:'FamilyMart 全家',region:'亚洲10国',detail:'日本/台湾/中国大陆/泰国/越南/印尼/菲律宾/马来西亚',tags:'asia',note:'日本最大便利店连锁之一，台湾最密集'},
+  {name:'Lawson 罗森',region:'亚洲5国',detail:'日本/中国大陆/印尼/泰国/菲律宾/夏威夷',tags:'asia',note:'日本第2大连锁，中国门店快速增长'},
+  {name:'美宜佳',region:'中国特有',detail:'广东/广西/湖南/湖北/福建/江西等华南省份',tags:'cn',note:'中国最大便利店(~30000家)，仅在华南，华南特有!'},
+  {name:'Circle K',region:'全球20+国',detail:'美国/加拿大/香港/澳门/台湾/北欧/波罗的海',tags:'us,eu,asia',note:'美国西海岸多，香港澳门极度密集'},
+  // 快递柜
+  {name:'蜂巢 Hive Box',region:'中国特有',detail:'全国城市社区均有',tags:'cn',note:'橙色柜体，中国独有快递柜品牌!'},
+  {name:'菜鸟驿站',region:'中国特有',detail:'全国城市，蓝+橙配色',tags:'cn',note:'阿里巴巴旗下，中国独有物流末端'},
+  {name:'Amazon Locker',region:'北美/欧洲/日本',detail:'美国/加拿大/英国/德国/法国/意大利/日本',tags:'us,eu,asia',note:'黄色柜体，Amazon标识'},
+  // 快餐
+  {name:'McDonald\'s 麦当劳',region:'全球100+国',detail:'几乎全球覆盖',tags:'asia,us,eu',note:'普遍但招牌配色统一(红黄)，各国菜单不同'},
+  {name:'KFC 肯德基',region:'全球100+国',detail:'全球覆盖，中国最多门店(~10000+)',tags:'asia,us,eu',note:'中国门店数量远超美国'},
+  {name:'汉堡王 Burger King',region:'全球70+国',detail:'美国/欧洲/中东/亚太',tags:'us,eu,asia',note:'黄色火焰logo，欧洲多于麦当劳的地区可辅助定位'},
+  {name:'Wendy\'s',region:'北美+亚洲少数',detail:'美国/加拿大/日本/印尼/菲律宾',tags:'us',note:'几乎仅北美，红色方形logo+辫子女孩'},
+  {name:'吉野家 Yoshinoya',region:'东亚+东南亚',detail:'日本/中国大陆/台湾/香港/新加坡/马来西亚',tags:'asia,cn,jp',note:'橙色招牌，牛丼连锁，日系定位强信号'},
+  // 奶茶/咖啡
+  {name:'星巴克 Starbucks',region:'全球80+国',detail:'全球覆盖，各地几乎都有',tags:'asia,us,eu',note:'过于普遍，定位价值有限'},
+  {name:'蜜雪冰城',region:'中国+东南亚',detail:'中国大陆/越南/印尼/泰国/马来西亚',tags:'cn,asia',note:'红色+雪人logo，中国最多(~25000+)，东南亚扩张中'},
+  {name:'喜茶 Heytea',region:'中国+海外少数',detail:'中国大陆/新加坡/英国/澳大利亚',tags:'cn,asia',note:'黑色极简风格，中国中高端茶饮'},
+  // 超市
+  {name:'Walmart 沃尔玛',region:'全球20+国',detail:'美国/加拿大/墨西哥/中美洲/中国/日本(西友)/英国(ASDA已退出)',tags:'us,cn',note:'美国+中国+墨西哥最多，欧洲较少'},
+  {name:'Costco',region:'全球10+国',detail:'美国/加拿大/墨西哥/英国/日本/韩国/台湾/澳大利亚/中国大陆',tags:'us,asia',note:'会员制大卖场，美国发源，全球扩张中'},
+  {name:'永辉超市',region:'中国特有',detail:'中国全国，福建发源',tags:'cn',note:'红蓝招牌，中国生鲜超市龙头'},
+];
+function searchBrand(){
+  let q=(document.getElementById('brand-input').value||'').toLowerCase();
+  let r=document.getElementById('brand-region').value;
+  let results=BRAND_DATA.filter(b=>{
+    if(r!=='all'&&!b.tags.includes(r))return false;
+    if(!q)return true;
+    return b.name.toLowerCase().includes(q)||b.detail.includes(q)||b.region.includes(q)||b.note.includes(q);
+  });
+  document.getElementById('brand-result').innerHTML=results.length===0?'无匹配品牌':results.map(b=>
+    `<div style="padding:6px 10px;margin:3px 0;background:rgba(240,184,48,0.04);border-radius:4px;border-left:3px solid var(--accent)">
+      <strong style="color:var(--accent)">${b.name}</strong> — <span style="color:var(--accent2)">${b.region}</span><br>
+      <span style="font-size:11px;color:var(--text2)">${b.detail}</span>
+      <span style="font-size:11px;color:var(--accent2)">💡 ${b.note}</span>
+    </div>`
+  ).join('');
+}
+
+/* ==================== URL 反查 ==================== */
+async function expandURL(){
+  let url=document.getElementById('url-input').value.trim();if(!url)return;
+  let el=document.getElementById('url-result');
+  el.textContent='展开中...';
+  // 检测已知短链接服务
+  let shorteners=['bit.ly','t.co','ow.ly','buff.ly','tinyurl.com','is.gd','goo.gl','shorte.st','cutt.ly','rb.gy'];
+  let isShort=shorteners.some(s=>url.includes(s));
+  if(!isShort&&!url.startsWith('http')){url='https://'+url}
+  try{
+    // 用 HEAD 请求跟踪重定向
+    let resp=await fetch('https://corsproxy.io/?'+encodeURIComponent(url),{method:'HEAD',redirect:'follow'});
+    let final=resp.url.replace('https://corsproxy.io/?','');
+    el.innerHTML=`🔗 最终地址: <a href="${final}" target="_blank" style="color:var(--accent)">${final}</a>
+      ${isShort?'<br>✅ 短链接已展开':''}<br>📡 响应状态: ${resp.status} | 内容类型: ${resp.headers.get('content-type')||'未知'}`;
+  }catch(e){
+    // 降级：显示原始URL信息
+    try{
+      let u=new URL(url);
+      el.innerHTML=`🌐 域名: <strong>${u.hostname}</strong><br>🔒 协议: ${u.protocol}<br>📂 路径: ${u.pathname}${u.search}<br>💡 CORS限制无法展开，请手动在浏览器打开`;
+    }catch{el.textContent='无效URL格式'}
+  }
+}
+function whoisURL(){
+  let url=document.getElementById('url-input').value.trim();if(!url)return;
+  try{let u=new URL(url.startsWith('http')?url:'https://'+url);
+    document.getElementById('url-result').innerHTML=`
+      🌐 域名: <strong>${u.hostname}</strong><br>
+      🔍 <a href="https://www.whois.com/whois/${u.hostname}" target="_blank" style="color:var(--accent)">Whois查询</a> |
+      📍 <a href="https://whatismyipaddress.com/ip/${u.hostname}" target="_blank" style="color:var(--accent2)">IP地理位置</a> |
+      🕸️ <a href="https://web.archive.org/web/*/${url}" target="_blank" style="color:var(--accent2)">Wayback存档</a> |
+      🔗 <a href="https://urlscan.io/search/#${u.hostname}" target="_blank" style="color:var(--accent2)">urlscan扫描</a>
+      <br>💡 点击上方链接在新窗口查看域名注册信息/服务器位置
+    `;
+  }catch(e){document.getElementById('url-result').textContent='无效URL格式'}
+}
+
+/* ==================== 太阳热力图 ==================== */
+function genHeatmap(){
+  let el=parseFloat(document.getElementById('hl-el').value);
+  let az=parseFloat(document.getElementById('hl-az').value);
+  let dv=document.getElementById('hl-date').value;
+  let tv=document.getElementById('hl-time').value;
+  let tol=parseFloat(document.getElementById('hl-tol').value)||3;
+  if(isNaN(el)||isNaN(az)||!dv||!tv)return;
+
+  let[y,m,d]=dv.split('-').map(Number);
+  let[hh,mm]=tv.split(':').map(Number);
+
+  let cv=document.getElementById('heatmap-canvas'),ctx=cv.getContext('2d');
+  let W=cv.width,H=cv.height;
+  ctx.clearRect(0,0,W,H);
+
+  // 画简化的世界地图背景(仅海岸轮廓示意)
+  ctx.fillStyle='rgba(10,10,32,0.9)';ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='rgba(100,100,150,0.15)';ctx.lineWidth=0.5;
+  // 经纬线
+  for(let lng=-180;lng<=180;lng+=30){let x=(lng+180)/360*W;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}
+  for(let lat=-90;lat<=90;lat+=30){let y=(90-lat)/180*H;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+
+  let points=[];
+  // 全球2°步长采样
+  for(let lat=-80;lat<=80;lat+=2){
+    for(let lng=-180;lng<180;lng+=2){
+      let uh=hh, um=m, ud=d, uy=y;
+      // UTC→当地时间(粗略)
+      let ltz=Math.round(lng/15);
+      let localH=hh+ltz;
+      if(localH<0){localH+=24;ud--} if(localH>=24){localH-=24;ud++}
+      let frac=(localH+mm/60)/24;
+      let jd=julianDay(uy,um,ud)-0.5+frac,jc=julianCentury(jd);
+      let{sal,obc,dec}=getSolarData(jc);
+      let sra=atan2d(cosd(obc)*sind(sal),cosd(sal));
+      let lst=norm360(280.46061837+360.98564736629*(jd-2451545.0)+lng);
+      let ha=norm360(lst-sra);if(ha>180)ha-=360;
+      let cel=asind(sind(lat)*sind(dec)+cosd(lat)*cosd(dec)*cosd(ha));
+      let caz=(sind(dec)-sind(lat)*cosd(90-cel))/(cosd(lat)*sind(90-cel));
+      caz=Math.max(-1,Math.min(1,caz));
+      let cazDeg=Math.acos(caz)*DEG;if(ha>0)cazDeg=360-cazDeg;
+
+      let elErr=Math.abs(cel-el);
+      let azErr=Math.abs(norm360(cazDeg)-norm360(az));
+      if(azErr>180)azErr=360-azErr;
+      let totalErr=Math.sqrt(elErr*elErr+azErr*azErr);
+
+      if(totalErr<tol*3)points.push({lat,lng,elErr,azErr,totalErr,cel,cazDeg});
+    }
+  }
+  if(points.length===0){ctx.fillStyle='#fff';ctx.fillText('无匹配点，检查输入',10,20);return}
+
+  // 着色：误差越小越绿，越大越暗
+  let maxErr=Math.max(...points.map(p=>p.totalErr));
+  points.forEach(p=>{
+    let x=(p.lng+180)/360*W,y=(90-p.lat)/180*H;
+    let ratio=Math.max(0,1-p.totalErr/Math.max(maxErr,0.1));
+    let r=Math.floor(255*(1-ratio)),g=Math.floor(200*ratio+55*(1-ratio)),b=Math.floor(100*(1-ratio));
+    ctx.fillStyle=`rgb(${r},${g},${b})`;
+    ctx.fillRect(x-1.5,y-1.5,3,3);
+  });
+
+  // 图例
+  for(let i=0;i<=4;i++){let r=1-i/4;ctx.fillStyle=`rgb(${Math.floor(255*(1-r))},${Math.floor(200*r+55*(1-r))},${Math.floor(100*(1-r))})`;ctx.fillRect(10+i*60,H-25,55,12)}
+  ctx.fillStyle='#c8c8e0';ctx.font='10px monospace';
+  ctx.fillText('← 误差大',10,H-30);ctx.fillText('误差小 →',250,H-30);
+  ctx.fillText(`太阳高${el}°方位${az}° | ${points.length}个候选点 | 容差${tol}°`,W/2-150,H-8);
+}
+
+/* ==================== 山峰识别 ==================== */
+async function findPeaks(){
+  let lat=parseFloat(document.getElementById('peak-lat').value);
+  let lng=parseFloat(document.getElementById('peak-lng').value);
+  let dir=parseFloat(document.getElementById('peak-dir').value);
+  let radius=parseFloat(document.getElementById('peak-r').value)||100;
+  if(isNaN(lat)||isNaN(lng)||isNaN(dir))return;
+  let el=document.getElementById('peak-result');
+  el.textContent='查询中...';
+  // 计算搜索区域中心(沿方向走半径的一半)
+  let midLat=lat+radius/2*cosd(dir)/111.32;
+  let midLng=lng+radius/2*sind(dir)/(111.32*cosd(lat));
+  let radM=radius*1000;
+  let query=`[out:json];node(around:${radM},${midLat},${midLng})[natural=peak];out body 30;`;
+  try{
+    let resp=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:query});
+    let data=await resp.json();
+    let peaks=(data.elements||[]).map(p=>{
+      let hv=haversine(lat,lng,p.lat,p.lon);
+      let bearing=hv.bearing;
+      let diff=Math.abs(norm360(bearing)-norm360(dir));
+      if(diff>180)diff=360-diff;
+      return{...p,dist:hv.dist,bearing,diff};
+    }).filter(p=>p.diff<20).sort((a,b)=>a.diff-b.diff||a.dist-b.dist).slice(0,15);
+    if(peaks.length===0){el.textContent='该方向未找到山峰，试扩大搜索半径';return}
+    el.innerHTML=peaks.map(p=>{
+      let elev=p.tags?.ele?parseFloat(p.tags.ele):'?';
+      let name=p.tags?.name||'未命名山峰';
+      let elevStr=elev!=='?'?elev+'m':'海拔未知';
+      let eye=lat+0.001; // 近似观测点海拔0
+      let hDist=p.dist*1000;
+      let ang=Math.atan((elev-0)/hDist)*DEG;
+      return `<div style="padding:4px 8px;margin:2px 0;background:rgba(240,184,48,0.04);border-radius:4px">
+        🏔️ <strong>${name}</strong> — ${elevStr} | 距离 ${p.dist.toFixed(1)}km 方位 ${p.bearing.toFixed(0)}° | 仰角 ${ang.toFixed(1)}°${p.diff<5?' ✅ 精准!':''}
+      </div>`;
+    }).join('');
+  }catch(e){el.textContent='查询失败(可能API限流): '+e.message}
+}
+
+/* ==================== EXIF 时间验证 ==================== */
+function verifyPhotoTime(){
+  let el=document.getElementById('time-verify-result');
+  if(!window._exifTime){el.textContent='请先上传有EXIF时间的照片';return}
+  let gps=window._exifGPS;
+  if(!gps){el.textContent='照片无GPS坐标，无法精确验证。如知道大致位置可手动输入经纬度到地方时面板对比。';return}
+  // 解析 EXIF 时间
+  let dtStr=window._exifTime; // 格式: "2025:08:10 14:30:00"
+  let parts=dtStr.split(' '),dParts=parts[0]?.split(':'),tParts=parts[1]?.split(':');
+  if(!dParts||!tParts){el.textContent='无法解析EXIF时间格式';return}
+  let y=+dParts[0],mo=+dParts[1],d=+dParts[2],h=+tParts[0],min=+tParts[1];
+  // 计算太阳位置
+  let jd=julianDay(y,mo,d)-0.5+h/24+min/1440,jc=julianCentury(jd);
+  let{obc,sal,dec}=getSolarData(jc);
+  let sra=atan2d(cosd(obc)*sind(sal),cosd(sal));
+  let lst=norm360(280.46061837+360.98564736629*(jd-2451545.0)+gps.lng);
+  let ha=norm360(lst-sra);if(ha>180)ha-=360;
+  let elv=asind(sind(gps.lat)*sind(dec)+cosd(gps.lat)*cosd(dec)*cosd(ha));
+  let caz=(sind(dec)-sind(gps.lat)*sind(elv))/(cosd(gps.lat)*cosd(elv));
+  caz=Math.max(-1,Math.min(1,caz));
+  let az=Math.acos(caz)*DEG;if(ha>0)az=360-az;
+  // 生成验证报告
+  let dir='';let a=az;
+  if(a<22.5||a>337.5)dir='北';else if(a<67.5)dir='东北';else if(a<112.5)dir='东';else if(a<157.5)dir='东南';else if(a<202.5)dir='南';else if(a<247.5)dir='西南';else if(a<292.5)dir='西';else dir='西北';
+  let timeStr=y+'/'+mo+'/'+d+' '+parts[1];
+  el.innerHTML=`EXIF时间: ${timeStr} | GPS: ${gps.lat.toFixed(4)},${gps.lng.toFixed(4)}<br>☀️ 当时太阳: 高度${elv.toFixed(1)}° 方位${az.toFixed(0)}°(${dir}) | ${elv>0?'白天':'夜间'}`;
+  // 反算影子
+  let shadowRatio=elv>5?Math.tan((90-elv)*RAD).toFixed(2):'很长';
+  if(elv>5)el.innerHTML+=`<br>📐 理论影子/物高比: 1:${shadowRatio} | 影子方向: ${norm360(az+180).toFixed(0)}°(${(()=>{let a=norm360(az+180);return a<22.5||a>337.5?'北':a<67.5?'东北':a<112.5?'东':a<157.5?'东南':a<202.5?'南':a<247.5?'西南':a<292.5?'西':'西北'})()})`;
+  el.innerHTML+=`<br>💡 对比照片实际影子的方向和长度 → 一致=时间真实，不一致=可疑`;
+}
+
+/* ==================== OSINT 搜索语句生成 ==================== */
+function genSearchQueries(){
+  let clues=document.getElementById('search-clues').value.trim();
+  if(!clues)return;
+  let enc=encodeURIComponent(clues);
+  let engClues=clues; // 简化版直接用中文，实际可加翻译
+  let links=[
+    {label:'🔗 Google 图片',url:'https://www.google.com/search?tbm=isch&q='+enc},
+    {label:'🔗 Google 网页',url:'https://www.google.com/search?q='+enc},
+    {label:'🔗 Yandex (俄语区最强)',url:'https://yandex.com/images/search?text='+enc},
+    {label:'🔗 百度图片',url:'https://image.baidu.com/search?word='+enc},
+    {label:'🔗 Bing 图片',url:'https://www.bing.com/images/search?q='+enc},
+    {label:'🔗 Reddit 限定',url:'https://www.google.com/search?q=site:reddit.com+'+enc},
+    {label:'🔗 Flickr 照片',url:'https://www.flickr.com/search/?text='+enc},
+    {label:'🗺️ Google Maps 搜地标',url:'https://www.google.com/maps/search/'+enc},
+    {label:'📷 Geograph (英国)',url:'https://www.geograph.org.uk/search.php?q='+enc},
+    {label:'🌐 WikiMapia',url:'https://wikimapia.org/#search='+enc},
+  ];
+  document.getElementById('search-links').style.display='block';
+  document.getElementById('search-links').innerHTML=links.map(l=>
+    `<a href="${l.url}" target="_blank" style="color:var(--accent2);margin-right:14px">${l.label}</a>`
+  ).join('<br>');
+}
+
+/* ==================== 车牌决策树 ==================== */
+let plateStep=0, plateAnswers={};
+const PLATE_TREE={
+  start:{q:'车牌底色？',opts:{'蓝底白字':'step_cn','白底':'step_white','黄底':'step_yellow','绿底':'step_green','红底':'step_red'}},
+  step_cn:{q:'文字是？',opts:{'汉字+拉丁(京A/沪B)':'中国标准小型车','仅拉丁+数字':'中国使馆/外资'}},
+  step_white:{q:'文字/区域？',opts:{'白底黑字+左蓝条星星':'欧盟标准','白底蓝字':'日本私家车','白底绿字':'日本商用','白底黑字无蓝条':'韩国/台湾/美国部分'}},
+  step_yellow:{q:'形状/附加特征？',opts:{'黄底黑字(后方)':'英国/荷兰/卢森堡','黄底黑字(前后)':'哥伦比亚/委内瑞拉','黄色长条(前后)':'部分非洲国家'}},
+  step_green:{q:'什么地区？',opts:{'绿底白字(渐变)':'中国新能源车','绿底黑字':'挪威新能源(部分)'}},
+  step_red:{q:'特征？',opts:{'红底白字':'香港市区出租车牌','红字(欧盟)':'部分比利时/波兰临时牌'}},
+};
+
+function initPlateTree(){
+  plateStep=0;plateAnswers={};
+  document.getElementById('plate-q').textContent=PLATE_TREE.start.q;
+  document.getElementById('plate-opts').innerHTML=Object.keys(PLATE_TREE.start.opts).map(k=>
+    `<button class="btn btn-go btn-sm" onclick="plateAnswer('${k}')">${k}</button>`
+  ).join('');
+  document.getElementById('plate-result').textContent='';
+  document.getElementById('plate-reset').style.display='none';
+}
+function plateAnswer(choice){
+  let node=plateStep===0?PLATE_TREE.start:PLATE_TREE['step_'+Object.keys(plateAnswers).length];
+  let next=node.opts[choice];
+  plateAnswers[plateStep]=choice;plateStep++;
+  if(next&&PLATE_TREE[next]){
+    document.getElementById('plate-q').textContent=PLATE_TREE[next].q;
+    document.getElementById('plate-opts').innerHTML=Object.keys(PLATE_TREE[next].opts).map(k=>
+      `<button class="btn btn-go btn-sm" onclick="plateAnswer('${k}')">${k}</button>`
+    ).join('');
+  }else{
+    let result=next||choice;
+    document.getElementById('plate-q').textContent='🎯 结论';
+    document.getElementById('plate-result').textContent=result;
+    document.getElementById('plate-opts').innerHTML='';
+    document.getElementById('plate-reset').style.display='inline';
+  }
+}
+
+/* ==================== 天气反查 ==================== */
+async function lookupWeather(){
+  let lat=parseFloat(document.getElementById('lt-lat').value);
+  let lng=parseFloat(document.getElementById('lt-lng').value);
+  let dv=document.getElementById('lt-date').value;
+  if(isNaN(lat)||isNaN(lng)||!dv)return;
+  document.getElementById('weather-info').textContent='查询中...';
+  try{
+    let resp=await fetch(`https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lng}&start_date=${dv}&end_date=${dv}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weathercode,cloud_cover_mean,windspeed_10m_max&timezone=auto`);
+    let data=await resp.json();
+    let d=data.daily;
+    if(!d||!d.time.length){document.getElementById('weather-info').textContent='该日期无数据(可能超过90天前)';return}
+    let wcode=d.weathercode?.[0];
+    let weatherMap={0:'☀️ 晴',1:'🌤 大部晴',2:'⛅ 多云',3:'☁️ 阴',45:'🌫 雾',51:'🌧 小雨',61:'🌧 中雨',71:'❄️ 小雪',80:'🌦 阵雨',95:'⛈ 雷暴'};
+    document.getElementById('weather-info').innerHTML=
+      `${dv} 天气: ${weatherMap[wcode]||'未知'} | 高温 ${d.temperature_2m_max?.[0]}°C 低温 ${d.temperature_2m_min?.[0]}°C | 降水 ${d.precipitation_sum?.[0]||0}mm | 云量 ${d.cloud_cover_mean?.[0]||'?'}% | 最大风速 ${d.windspeed_10m_max?.[0]||'?'}km/h`;
+  }catch(e){document.getElementById('weather-info').textContent='查询失败: '+e.message}
+}
+
+/* ==================== 线索清单交互 ==================== */
+const CHECKLIST_ITEMS=[
+  {kw:'exif',txt:'拍照时间 — EXIF/截图时间/社交媒体时间戳→确定日期时间'},
+  {kw:'shadow',txt:'太阳/影子 — 影子长度→太阳高度角；方向→太阳方位角→用阴影反推'},
+  {kw:'moon',txt:'月亮 — 月相+照度约束日期；月亮高度+方向辅助定位'},
+  {kw:'script2',txt:'文字系统 — 招牌/广告/路标文字→语言/国家/地区'},
+  {kw:'plate2',txt:'车牌格式 — 颜色+排列→国家(有时精确到省/州)'},
+  {kw:'driving',txt:'道路行驶方向 — 靠左/靠右→排除一半国家'},
+  {kw:'road',txt:'路标样式 — 颜色+形状+字体→国家识别'},
+  {kw:'bollard',txt:'路桩/护栏 — 不同国家Bollard设计差异极大'},
+  {kw:'arch',txt:'建筑风格 — 屋顶/窗户/阳台/材料→区域识别'},
+  {kw:'veg',txt:'植被类型 — 热带/温带/地中海/针叶林→气候带→纬度'},
+  {kw:'util',txt:'电线杆/路灯 — 样式差异→国家/地区识别'},
+  {kw:'mail',txt:'邮筒/消防栓 — 颜色+形状→国家特定'},
+  {kw:'taxi',txt:'出租车颜色 — 许多城市有统一涂装'},
+  {kw:'currency',txt:'货币/价格标签 — ¥/$/€/£符号+价格水平→区域'},
+  {kw:'power',txt:'电源插座 — 室内照片插座样式→国家集团'},
+  {kw:'stars',txt:'星空 — 北极星高度=纬度；星座可见性→季节+半球'},
+  {kw:'flag',txt:'旗帜 — 国旗/省旗/市旗→直接定位'},
+  {kw:'number',txt:'数字格式 — 阿拉伯/东方阿拉伯/中文数字→文化区域'},
+  {kw:'phone',txt:'电话区号 — 广告上电话号码→国家代码'},
+  {kw:'verify',txt:'交叉验证 — 综合线索在Google Maps/Street View验证'},
+];
+
+function initChecklist(){
+  let el=document.getElementById('checklist-items');if(!el)return;
+  let checked=JSON.parse(localStorage.getItem('cc_checklist')||'{}');
+  el.innerHTML=CHECKLIST_ITEMS.map((item,i)=>{
+    let c=checked[i]?'checked':'';
+    return `<div style="padding:7px 10px;margin:3px 0;background:${c?'rgba(240,184,48,0.08)':'rgba(79,195,247,0.03)'};border-left:3px solid ${c?'var(--accent)':'var(--accent2)'};border-radius:0 4px 4px 0;font-size:13px;line-height:1.6;cursor:pointer;display:flex;align-items:flex-start;gap:8px" onclick="checklistToggle(${i})">
+      <input type="checkbox" ${c} style="margin-top:3px;pointer-events:none;accent-color:var(--accent)">
+      <span style="${c?'text-decoration:line-through;opacity:0.7':''}"><strong>${i+1}.</strong> ${item.txt}</span>
+    </div>`;
+  }).join('');
+  updateChecklistProgress();
+}
+function checklistToggle(i){
+  let checked=JSON.parse(localStorage.getItem('cc_checklist')||'{}');
+  checked[i]=!checked[i];
+  localStorage.setItem('cc_checklist',JSON.stringify(checked));
+  initChecklist();
+}
+function checklistCheckAll(){localStorage.setItem('cc_checklist',JSON.stringify(CHECKLIST_ITEMS.map(()=>true)));initChecklist()}
+function checklistClearAll(){localStorage.removeItem('cc_checklist');initChecklist()}
+function updateChecklistProgress(){
+  let checked=JSON.parse(localStorage.getItem('cc_checklist')||'{}');
+  let n=Object.values(checked).filter(Boolean).length;
+  document.getElementById('checklist-progress').textContent=`进度: ${n}/${CHECKLIST_ITEMS.length} (${Math.round(n/CHECKLIST_ITEMS.length*100)}%)`;
+}
+setTimeout(initChecklist,300);
+
 /* ==================== 启动 ==================== */
 function init(){
   initDates();
@@ -1952,12 +2451,80 @@ function init(){
 window.addEventListener('DOMContentLoaded',init);
 console.log('🔍 网络谜踪工具合集 OSINT Toolkit — MIT License');
 console.log('日月·地磁·星空·地理工具·知识图鉴·线索清单·坐标系统');
+setTimeout(initPlateTree,400);
+setTimeout(searchCellRef,200);
+setTimeout(searchBrand,200);
 </script>
 <script>
 // 注册 Service Worker (PWA 离线支持)
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('/osint-sw.js').then(()=>console.log('PWA SW 已注册')).catch(()=>{});
 }
+</script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// 嵌入式地图
+let osmMap=null, osmMarkers=[], osmMarkerGroup=null;
+function initMap(){
+  if(osmMap)return;
+  let el=document.getElementById('osm-map');if(!el)return;
+  osmMap=L.map('osm-map').setView([35,105],4);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(osmMap);
+  osmMarkerGroup=L.layerGroup().addTo(osmMap);
+  osmMap.on('click',function(e){
+    let lat=e.latlng.lat.toFixed(6),lng=e.latlng.lng.toFixed(6);
+    document.getElementById('map-inp-lat').value=lat;
+    document.getElementById('map-inp-lng').value=lng;
+    addMapMarker(lat,lng,'📍 '+lat+','+lng);
+    document.getElementById('map-coords-display').textContent='已选: '+lat+', '+lng;
+  });
+  // 加载存储的标记
+  let saved=localStorage.getItem('cc_map_markers');
+  if(saved)JSON.parse(saved).forEach(m=>addMapMarker(m.lat,m.lng,m.label));
+}
+function addMapMarker(lat,lng,label){
+  if(!osmMap)initMap();
+  let m=L.marker([lat,lng]).addTo(osmMarkerGroup);
+  if(label)m.bindPopup(label);
+  osmMarkers.push({marker:m,lat,lng,label});
+  saveMapMarkers();
+}
+function jumpMap(){
+  let lat=parseFloat(document.getElementById('map-inp-lat').value);
+  let lng=parseFloat(document.getElementById('map-inp-lng').value);
+  let zoom=parseInt(document.getElementById('map-zoom').value)||13;
+  if(isNaN(lat)||isNaN(lng))return;
+  if(!osmMap)initMap();
+  osmMap.setView([lat,lng],zoom);
+  addMapMarker(lat,lng,'📍 '+lat.toFixed(6)+','+lng.toFixed(6));
+  document.getElementById('map-coords-display').textContent='已跳转: '+lat.toFixed(6)+', '+lng.toFixed(6);
+}
+function clearMapMarkers(){
+  osmMarkers=[];if(osmMarkerGroup)osmMarkerGroup.clearLayers();
+  localStorage.removeItem('cc_map_markers');
+  document.getElementById('map-coords-display').textContent='标记已清除';
+}
+function fitAllMarkers(){
+  if(!osmMap||osmMarkers.length===0)return;
+  let group=L.featureGroup(osmMarkers.map(m=>m.marker));
+  osmMap.fitBounds(group.getBounds().pad(0.1));
+}
+function saveMapMarkers(){
+  localStorage.setItem('cc_map_markers',JSON.stringify(osmMarkers.map(m=>({lat:m.lat,lng:m.lng,label:m.label}))));
+}
+function showOnMap(lat,lng,label){
+  if(!osmMap)initMap();
+  osmMap.setView([lat,lng],15);
+  addMapMarker(lat,lng,label||'📍');
+  document.getElementById('map-coords-display').textContent=label||(lat.toFixed(6)+','+lng.toFixed(6));
+}
+// 切换到地理工具时初始化地图
+setTimeout(()=>{
+  let obs=new MutationObserver(()=>{
+    if(document.getElementById('panel-geotools')?.classList.contains('active'))initMap();
+  });
+  document.querySelectorAll('.tab-btn[data-tab="geotools"]').forEach(b=>b.addEventListener('click',()=>setTimeout(initMap,200)));
+},500);
 </script>
 </body>
 </html>
