@@ -277,6 +277,41 @@ h4.sub-title{color:var(--accent2);margin-bottom:8px;font-size:14px}
 
 <!-- ==================== 4. 阴影反推 ==================== -->
 <div class="tab-panel" id="panel-shadow">
+  <!-- 🧭 影子罗盘 -->
+  <div class="result-box" style="margin-bottom:12px;border:2px dashed rgba(240,184,48,0.25)">
+    <h3 style="color:var(--accent)">🧭 影子罗盘 <span style="font-size:11px;color:var(--text2);font-weight:normal">— 在图中画影子方向线</span></h3>
+    <div style="display:flex;flex-wrap:wrap;gap:12px">
+      <div style="flex:1;min-width:280px">
+        <canvas id="shadow-compass" width="280" height="280" style="border-radius:50%;background:radial-gradient(circle,#1a1a3e,#0a0a1a);border:2px solid var(--border);cursor:crosshair;display:block"></canvas>
+        <div style="text-align:center;font-size:10px;color:var(--text2);margin-top:2px">点击中心→拖到影子末端→松开 | 🟡太阳方向=影子反方向</div>
+      </div>
+      <div style="flex:1;min-width:200px;font-size:12px">
+        <div class="result-item" style="margin-bottom:6px"><div class="val sm" id="sc-dir">--</div><div class="lbl">影子方向</div></div>
+        <div class="result-item" style="margin-bottom:6px"><div class="val sm" id="sc-sun-az">--</div><div class="lbl">☀️ 推算太阳方位角</div></div>
+        <div class="result-item" style="margin-bottom:6px"><div class="val sm" id="sc-ratio">--</div><div class="lbl">影子长度/罗盘半径比</div></div>
+        <button class="btn btn-go btn-sm" onclick="applyShadowCompass()">📐 填入阴影反推</button>
+        <button class="btn btn-go btn-sm" onclick="resetShadowCompass()">🔄 重置</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 📏 照片比例尺 -->
+  <div class="result-box" style="margin-bottom:12px">
+    <h3 style="color:var(--accent)">📏 照片比例尺推算</h3>
+    <div class="row">
+      <div class="field"><label>参考物实际高度(m)</label><input id="scale-real" value="1.70" class="w80"><select id="scale-preset" onchange="scalePreset()" style="background:var(--input-bg);color:var(--text);border:1px solid var(--border);border-radius:4px;font-size:11px;padding:3px 6px"><option value="">快捷选择</option><option value="1.70">🧍 成人身高 ~1.7m</option><option value="1.20">🚗 车门高度 ~1.2m</option><option value="1.00">🚧 路桩高度 ~1m</option><option value="0.45">🛞 轮胎直径 ~0.45m</option><option value="0.30">📮 邮筒 ~0.3m</option><option value="2.50">🚪 门高 ~2.5m</option></select></div>
+      <div class="field"><label>参考物像素高度</label><input id="scale-px" class="w80" placeholder="如 340"></div>
+      <div class="field"><label>目标物像素高度</label><input id="scale-target-px" class="w80" placeholder="如 120"></div>
+      <button class="btn btn-go btn-sm" onclick="calcScale()">计算</button>
+    </div>
+    <div class="result-row">
+      <div class="result-item"><div class="val sm" id="scale-ratio">--</div><div class="lbl">比例 (m/px)</div></div>
+      <div class="result-item"><div class="val sm" id="scale-target-size">--</div><div class="lbl">目标物估算尺寸</div></div>
+      <div class="result-item"><div class="val sm" id="scale-focal-hint">--</div><div class="lbl">相机焦距参考</div></div>
+    </div>
+    <div class="note">💡 已知照片中一个物体的真实尺寸→推算其他物体的尺寸→配合已知尺寸物体(车牌/轮胎/门窗)定位。</div>
+  </div>
+
   <h3 class="panel-title">📐 从影子反推地理位置</h3>
   <div class="row">
     <div class="field"><label>物体高度 (如 1.75m)</label><input id="sh-h" value="1.75"></div>
@@ -581,6 +616,44 @@ h4.sub-title{color:var(--accent2);margin-bottom:8px;font-size:14px}
       <button class="btn btn-go btn-sm" onclick="genSearchQueries()">🔍 生成</button>
     </div>
     <div id="search-links" style="display:none;margin-top:8px;font-size:12px;line-height:2"></div>
+  </div>
+
+  <!-- 视频逐帧分析 -->
+  <div class="result-box" style="margin-bottom:12px">
+    <h3 style="color:var(--accent)">🎬 视频逐帧分析 <span style="font-size:11px;color:var(--text2);font-weight:normal">— 拖视频→自动抽关键帧</span></h3>
+    <div class="row">
+      <input type="file" id="video-file" accept="video/*" style="display:none" onchange="loadVideo(this)">
+      <div id="video-drop" style="flex:1;min-width:200px;border:2px dashed var(--border);border-radius:8px;padding:16px;text-align:center;cursor:pointer;background:var(--input-bg)"
+           ondragover="this.style.borderColor='var(--accent)';event.preventDefault()"
+           ondragleave="this.style.borderColor='var(--border)'"
+           ondrop="handleVideoDrop(event)"
+           onclick="document.getElementById('video-file').click()">
+        <div style="font-size:28px">🎥</div>
+        <div style="font-size:12px;color:var(--text2)">拖短视频到此处<br>或点击选择 MP4/WebM</div>
+      </div>
+      <div style="flex:1;min-width:200px">
+        <div class="field"><label>抽帧间隔(秒)</label><input id="frame-interval" value="2" class="w80"></div>
+        <button class="btn btn-go btn-sm" onclick="extractFrames()">🖼️ 抽帧</button>
+        <span id="frame-status" style="font-size:11px;color:var(--text2);margin-left:8px"></span>
+      </div>
+    </div>
+    <div id="frame-strip" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;max-height:300px;overflow-y:auto"></div>
+    <div class="note">💡 逐帧分析视频中的车牌/路标/建筑→某些帧可能拍到一闪而过的关键线索。</div>
+  </div>
+
+  <!-- 卫星过境查询 -->
+  <div class="result-box" style="margin-bottom:12px">
+    <h3 style="color:var(--accent)">🛰️ 卫星/航班过境查询</h3>
+    <div class="row">
+      <div class="field"><label>纬度</label><input id="sat-lat" class="w80" value="39.9"></div>
+      <div class="field"><label>经度</label><input id="sat-lng" class="w80" value="116.4"></div>
+      <div class="field"><label>日期</label><input id="sat-date" type="date"></div>
+      <div class="field"><label>时间</label><input id="sat-time" type="time" value="12:00"></div>
+      <button class="btn btn-go btn-sm" onclick="querySatPasses()">🛰️ 查卫星</button>
+      <button class="btn btn-go btn-sm" onclick="queryFlights()">✈️ 查航班</button>
+    </div>
+    <div id="sat-result" style="margin-top:6px;font-size:11px;line-height:1.7;color:var(--text);max-height:200px;overflow-y:auto"></div>
+    <div class="note">💡 卫星: ISS/天宫/星链过境时间 | 航班: OpenSky免费API，查询附近空域实时飞机。照片拍到飞机尾迹→查当时航班→缩小航线范围。</div>
   </div>
 
   <!-- 基站/WiFi 参考 -->
@@ -2042,6 +2115,191 @@ document.getElementById('know-tags').addEventListener('click',e=>{
     });
   });
 });
+
+/* ==================== 视频逐帧分析 ==================== */
+let videoFile=null, videoEl=null;
+function handleVideoDrop(e){e.preventDefault();e.target.style.borderColor='var(--border)';let f=e.dataTransfer.files[0];if(f)loadVideoFile(f)}
+function loadVideo(input){let f=input.files[0];if(f)loadVideoFile(f)}
+function loadVideoFile(file){
+  if(!file.type.startsWith('video/')){document.getElementById('frame-status').textContent='请选择视频文件';return}
+  videoFile=file;
+  document.getElementById('frame-status').textContent='已加载: '+file.name+' ('+(file.size/1024/1024).toFixed(1)+'MB)';
+}
+function extractFrames(){
+  if(!videoFile){document.getElementById('frame-status').textContent='请先加载视频';return}
+  let interval=parseFloat(document.getElementById('frame-interval').value)||2;
+  let strip=document.getElementById('frame-strip'),status=document.getElementById('frame-status');
+  strip.innerHTML='';status.textContent='抽帧中...';
+  let url=URL.createObjectURL(videoFile);
+  if(!videoEl)videoEl=document.createElement('video');
+  videoEl.src=url;videoEl.muted=true;videoEl.currentTime=0;
+  videoEl.onloadedmetadata=function(){
+    let dur=videoEl.duration;if(dur>60){status.textContent='视频过长(>60s)，仅分析前60秒';dur=60}
+    let times=[],t=0;
+    while(t<dur){times.push(t);t+=interval}
+    let frames=[];
+    function seekNext(i){
+      if(i>=times.length){status.textContent='完成: '+frames.length+'帧';videoEl.pause();return}
+      videoEl.currentTime=times[i];
+      videoEl.onseeked=function(){
+        let cv=document.createElement('canvas');cv.width=160;cv.height=90;
+        cv.getContext('2d').drawImage(videoEl,0,0,160,90);
+        let dataUrl=cv.toDataURL('image/jpeg',0.7);
+        let div=document.createElement('div');
+        div.style.cssText='cursor:pointer;border:1px solid var(--border);border-radius:4px;overflow:hidden;position:relative';
+        div.innerHTML=`<img src="${dataUrl}" style="width:120px;height:68px;display:block"><div style="font-size:9px;color:var(--text2);text-align:center;background:var(--panel)">${times[i].toFixed(1)}s</div>`;
+        div.title='点击复制此帧到剪贴板(可粘贴到聊天工具)';
+        div.onclick=function(){
+          let a=document.createElement('a');a.href=dataUrl;a.download='frame_'+times[i].toFixed(1)+'s.jpg';a.click();
+          document.getElementById('frame-status').textContent='已下载: 第'+times[i].toFixed(1)+'秒帧';
+        };
+        strip.appendChild(div);
+        status.textContent='抽帧: '+(i+1)+'/'+times.length;
+        seekNext(i+1);
+      };
+    }
+    seekNext(0);
+  };
+}
+
+/* ==================== 卫星/航班过境 ==================== */
+async function querySatPasses(){
+  let lat=parseFloat(document.getElementById('sat-lat').value);
+  let lng=parseFloat(document.getElementById('sat-lng').value);
+  let el=document.getElementById('sat-result');if(isNaN(lat)||isNaN(lng))return;
+  el.textContent='查询中...';
+  // ISS + 天宫 过境时间
+  let now=new Date();let ts=Math.floor(now.getTime()/1000);
+  let sats=['ISS (ZARYA) 国际空间站','TIANGONG 中国空间站'];
+  let info=sats.map(s=>s+' — 轨道周期约90分钟，经过头顶时非常亮(可达-5等)').join('<br>');
+  // 使用 N2YO 链接
+  let links=[
+    `<a href="https://www.n2yo.com/passes/?s=25544&lat=${lat}&lng=${lng}" target="_blank" style="color:var(--accent)">🔗 ISS过境预报 (N2YO)</a>`,
+    `<a href="https://www.n2yo.com/passes/?s=54216&lat=${lat}&lng=${lng}" target="_blank" style="color:var(--accent2)">🔗 天宫过境预报 (N2YO)</a>`,
+    `<a href="https://findstarlink.com/" target="_blank" style="color:var(--accent2)">🔗 Starlink星链过境</a>`,
+  ];
+  el.innerHTML=info+'<br><br>'+links.join(' | ')+
+    `<br><br>💡 <strong>Starlink卫星链</strong>: 发射后数天内可见为"星链火车"(一串亮点排队飞过)。单颗Starlink过境约1-3分钟可见。<br>
+    💡 <strong>铱星闪光</strong>: 虽然大多数铱星已退役，但新一代卫星偶尔也会产生闪光。闪光持续1-3秒，亮度可达-8等（比金星还亮）。`;
+}
+
+async function queryFlights(){
+  let lat=parseFloat(document.getElementById('sat-lat').value);
+  let lng=parseFloat(document.getElementById('sat-lng').value);
+  let el=document.getElementById('sat-result');if(isNaN(lat)||isNaN(lng))return;
+  el.textContent='查询OpenSky航班数据...';
+  // 查询半径2°范围内的飞机
+  let lamin=lat-2,lamax=lat+2,lomin=lng-2,lomax=lng+2;
+  try{
+    let resp=await fetch(`https://opensky-network.org/api/states/all?lamin=${lamin}&lomin=${lomin}&lamax=${lamax}&lomax=${lomax}`);
+    let data=await resp.json();
+    if(!data.states||data.states.length===0){el.innerHTML='当前无航班经过该空域<br>💡 历史航班数据: <a href="https://www.flightradar24.com/" target="_blank" style="color:var(--accent)">FlightRadar24</a> | <a href="https://www.adsbexchange.com/" target="_blank" style="color:var(--accent2)">ADSB Exchange</a>';return}
+    let flights=data.states.slice(0,20).map(s=>({
+      icao:s[0],callsign:(s[1]||'').trim(),country:s[2],lat:s[6],lng:s[5],alt:s[7],vel:s[9],track:s[10]
+    })).filter(f=>f.lat&&f.lng);
+    el.innerHTML=flights.map(f=>{
+      let dist=haversine(lat,lng,f.lat,f.lng).dist;
+      let dir=haversine(lat,lng,f.lat,f.lng).bearing.toFixed(1);
+      let level=f.alt?Math.round(f.alt/30.48/100)+'万英尺':'?';
+      return `<div style="padding:3px 6px;margin:1px 0;background:rgba(79,195,247,0.04);border-radius:3px;font-family:monospace;font-size:11px">
+      ✈️ <strong style="color:var(--accent)">${f.callsign||f.icao||'N/A'}</strong> ${f.country||''} | 高度${level} | 距离${dist.toFixed(1)}km 方位${dir}° ${f.track?`航向${f.track.toFixed(0)}°`:''}
+      </div>`;
+    }).join('')+`<br>💡 共${data.states.length}架飞机在空域内。数据来源: OpenSky Network`;
+  }catch(e){el.innerHTML=`OpenSky API限流，请稍后重试<br>💡 备用: <a href="https://www.flightradar24.com/" target="_blank" style="color:var(--accent)">FlightRadar24</a> | <a href="https://www.adsbexchange.com/?lat=${lat}&lon=${lng}&zoom=12" target="_blank" style="color:var(--accent2)">ADSB Exchange</a>`}
+}
+
+/* ==================== 影子罗盘 ==================== */
+let scCtx=null,scDrawing=false,scStart={},scEnd={};
+setTimeout(()=>{
+  let cv=document.getElementById('shadow-compass');if(!cv)return;
+  scCtx=cv.getContext('2d');
+  drawCompassBase();
+  cv.addEventListener('mousedown',e=>{scDrawing=true;let r=cv.getBoundingClientRect();scStart.x=(e.clientX-r.left)/cv.width*280;scStart.y=(e.clientY-r.top)/cv.height*280});
+  cv.addEventListener('mousemove',e=>{if(!scDrawing)return;let r=cv.getBoundingClientRect();scEnd.x=(e.clientX-r.left)/cv.width*280;scEnd.y=(e.clientY-r.top)/cv.height*280;drawCompassBase();drawShadowLine()});
+  cv.addEventListener('mouseup',()=>{scDrawing=false;if(scEnd.x!==undefined)updateShadowCompass()});
+},300);
+
+function drawCompassBase(){
+  let ctx=scCtx,cv=document.getElementById('shadow-compass');if(!ctx)return;
+  ctx.clearRect(0,0,280,280);
+  let cx=140,cy=140,r=125;
+  // 罗盘环
+  ctx.beginPath();ctx.arc(cx,cy,r,0,2*Math.PI);ctx.strokeStyle='rgba(200,200,220,0.3)';ctx.lineWidth=2;ctx.stroke();
+  ctx.beginPath();ctx.arc(cx,cy,r-20,0,2*Math.PI);ctx.strokeStyle='rgba(200,200,220,0.1)';ctx.stroke();
+  // 刻度
+  for(let i=0;i<360;i+=15){
+    let rad=(i-90)*Math.PI/180, cos=Math.cos(rad),sin=Math.sin(rad);
+    let r1=i%90===0?r-15:r-10,r2=i%90===0?r-5:r-8;
+    ctx.beginPath();ctx.moveTo(cx+cos*r1,cy+sin*r1);ctx.lineTo(cx+cos*r2,cy+sin*r2);
+    ctx.strokeStyle=i%90===0?'rgba(240,184,48,0.5)':'rgba(200,200,220,0.2)';ctx.stroke();
+  }
+  // 方向标签
+  let dirs={N:'北',E:'东',S:'南',W:'西'},dOff={N:[0,-20],E:[22,0],S:[0,28],W:[-24,0]};
+  ['N','E','S','W'].forEach((d,i)=>{let rad=(-90+i*90)*Math.PI/180;ctx.fillStyle='var(--text2)';ctx.font='12px sans-serif';ctx.fillText(dirs[d],cx+Math.cos(rad)*r+dOff[d][0],cy+Math.sin(rad)*r+dOff[d][1])});
+  ctx.fillStyle='var(--accent)';ctx.font='bold 12px sans-serif';
+  // 中心点
+  ctx.beginPath();ctx.arc(cx,cy,4,0,2*Math.PI);ctx.fillStyle='var(--accent)';ctx.fill();
+}
+function drawShadowLine(){
+  let ctx=scCtx,cx=140,cy=140;
+  ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(scEnd.x,scEnd.y);
+  ctx.strokeStyle='rgba(0,210,255,0.8)';ctx.lineWidth=3;ctx.stroke();
+  // 箭头
+  let dx=scEnd.x-cx,dy=scEnd.y-cy,dist=Math.sqrt(dx*dx+dy*dy);
+  if(dist>5){
+    let ux=dx/dist,uy=dy/dist;
+    ctx.beginPath();ctx.moveTo(scEnd.x,scEnd.y);ctx.lineTo(scEnd.x-10*ux+4*uy,scEnd.y-10*uy-4*ux);ctx.lineTo(scEnd.x-10*ux-4*uy,scEnd.y-10*uy+4*ux);ctx.fillStyle='rgba(0,210,255,0.8)';ctx.fill();
+  }
+}
+function updateShadowCompass(){
+  let cx=140,cy=140,dx=scEnd.x-cx,dy=cy-scEnd.y; // Y轴翻转（图片坐标系）
+  let dir=Math.atan2(dx,dy)*180/Math.PI; // 从正北顺时针
+  if(dir<0)dir+=360;
+  let sunAz=norm360(dir+180);
+  let dist=Math.sqrt((scEnd.x-cx)**2+(scEnd.y-cy)**2);
+  let ratio=dist/125; // 125=罗盘半径
+  document.getElementById('sc-dir').textContent=dir.toFixed(1)+'°';
+  document.getElementById('sc-sun-az').textContent=sunAz.toFixed(1)+'°';
+  document.getElementById('sc-ratio').textContent=ratio.toFixed(3);
+  // 画太阳方向虚线
+  let sunRad=(sunAz-90)*Math.PI/180;
+  ctx.beginPath();ctx.moveTo(cx,cy);ctx.setLineDash([5,5]);ctx.lineTo(cx+Math.cos(sunRad)*80,cy+Math.sin(sunRad)*80);
+  ctx.strokeStyle='rgba(240,184,48,0.5)';ctx.lineWidth=1;ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='#f0b830';ctx.font='10px sans-serif';
+  ctx.fillText('☀️ 太阳方向',cx+Math.cos(sunRad)*85-20,cy+Math.sin(sunRad)*85-5);
+}
+function applyShadowCompass(){
+  let sunAz=document.getElementById('sc-sun-az').textContent.replace('°','');
+  if(sunAz==='--')return;
+  document.getElementById('sh-azim').value=sunAz;
+  let ratio=parseFloat(document.getElementById('sc-ratio').textContent);
+  if(!isNaN(ratio)&&ratio>0){
+    let h=parseFloat(document.getElementById('sh-h').value)||1.75;
+    document.getElementById('sh-l').value=(h*ratio).toFixed(2);
+  }
+  updateShadow();
+}
+function resetShadowCompass(){drawCompassBase();document.getElementById('sc-dir').textContent='--';document.getElementById('sc-sun-az').textContent='--';document.getElementById('sc-ratio').textContent='--';scEnd={}}
+
+/* ==================== 比例尺推算 ==================== */
+function scalePreset(){
+  let v=document.getElementById('scale-preset').value;
+  if(v)document.getElementById('scale-real').value=v;
+}
+function calcScale(){
+  let real=parseFloat(document.getElementById('scale-real').value);
+  let px=parseFloat(document.getElementById('scale-px').value);
+  let tpx=parseFloat(document.getElementById('scale-target-px').value);
+  if(isNaN(real)||isNaN(px)||px<=0)return;
+  let ratio=real/px;
+  document.getElementById('scale-ratio').textContent=ratio.toFixed(5)+' m/px';
+  if(!isNaN(tpx)&&tpx>0)document.getElementById('scale-target-size').textContent=(ratio*tpx).toFixed(2)+' m';
+  else document.getElementById('scale-target-size').textContent='--';
+  // 焦距参考: FOV约=2*atan(传感器宽/(2*焦距)), 简化版
+  // 假设目标距离D, 像高h(px)*比例=m, 传感器高~24mm(全画幅竖拍)
+  // 距离≈f*real*h_px/(px*sensor_h) 这需要更多输入, 只给提示
+  document.getElementById('scale-focal-hint').textContent=ratio<0.001?'超远距(>500m)':ratio<0.005?'远景(~200m)':ratio<0.02?'中景(~50m)':ratio<0.1?'近景(~10m)':'特写(<5m)';
+}
 
 /* ==================== 基站 WiFi 参考 ==================== */
 const CELL_DATA=[
